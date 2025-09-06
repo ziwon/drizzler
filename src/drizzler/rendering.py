@@ -1,7 +1,5 @@
 from typing import Dict, List, Optional, Tuple
 
-
-
 def render_latency_histogram(latencies: List[float], bins: int = 20) -> str:
     if not latencies:
         return "No latency data."
@@ -27,6 +25,7 @@ def render_latency_histogram(latencies: List[float], bins: int = 20) -> str:
         bar = "#" * max(1, int((c / peak) * width)) if peak else ""
         lines.append(f"{left:.3f}s – {right:.3f}s | {bar} ({c})")
     return "Latency Histogram\n" + "\n".join(lines)
+
 
 def render_timeline(
     timeline: Dict[int, List[Tuple[float, float, str, Optional[int]]]],

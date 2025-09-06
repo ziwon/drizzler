@@ -1,5 +1,4 @@
-__all__ = ["RequestDrizzler", "BoundedTokenBucket", "render_latency_histogram", "render_timeline"]
+from .cli import main
 
-
-from .drizzler import RequestDrizzler, BoundedTokenBucket
-from .ascii_render import render_latency_histogram, render_timeline
+__version__ = "1.0.0"
+__all__ = ["main"]

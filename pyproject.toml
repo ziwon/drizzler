@@ -1,6 +1,6 @@
 [project]
 name = "drizzler"
-version = "0.1.0"
+version = "0.2.0"
 description = "Adaptive host-aware throttling + YouTube download example via yt-dlp"
 readme = "README.md"
 authors = [
@@ -9,12 +9,13 @@ authors = [
 requires-python = ">=3.11"
 dependencies = [
     "aiohttp>=3.12.15",
+    "brotlicffi>=1.1.0.0",
     "python-dotenv>=1.1.1",
     "yt-dlp>=2025.9.5",
 ]
 
 [project.scripts]
-drizzler = "drizzler:main"
+drizzler = "drizzler.cli:main"
 
 [build-system]
 requires = ["uv_build>=0.8.4,<0.9.0"]
