@@ -1,0 +1,27 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# uv
+.venv/
+.pyenv/
+.uv/
+uv.lock
+
+# dotenv
+.env
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Downloaded files
+*.webm
+*.mp4
+*.mkv
+*.part
+*.tmp

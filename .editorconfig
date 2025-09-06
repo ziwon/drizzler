@@ -1,0 +1,84 @@
+# top-most EditorConfig file
+root = true
+
+# --- Defaults (Linux-friendly) ---
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 4
+max_line_length = 100
+
+# --- Python ---
+[*.py]
+indent_style = space
+indent_size = 4
+# If using Black, set line-length = 100 in pyproject.toml to match.
+
+# --- Shell / Make / Configs ---
+[*.sh]
+indent_style = space
+indent_size = 2
+end_of_line = lf
+
+[Makefile]
+indent_style = tab
+indent_size = 4
+
+[*.env]
+indent_style = space
+indent_size = 2
+trim_trailing_whitespace = false  # keep intentional spaces
+
+[*.ini]
+indent_style = space
+indent_size = 2
+
+[*.cfg]
+indent_style = space
+indent_size = 2
+
+# --- Data / Markup ---
+[*.json]
+indent_style = space
+indent_size = 2
+
+[*.yaml]
+indent_style = space
+indent_size = 2
+
+[*.yml]
+indent_style = space
+indent_size = 2
+
+[*.md]
+trim_trailing_whitespace = false  # preserve Markdown table spacing
+indent_style = space
+indent_size = 2
+max_line_length = off            # don't hard-wrap prose
+
+[*.rst]
+trim_trailing_whitespace = false
+indent_style = space
+indent_size = 3
+
+# --- Git / Text ---
+[.gitignore]
+trim_trailing_whitespace = false
+
+[*.txt]
+indent_style = space
+indent_size = 2
+max_line_length = off
+
+# --- Generated assets (don’t fight formatters) ---
+[*.min.js]
+max_line_length = off
+trim_trailing_whitespace = false
+
+[*.lock]
+indent_style = space
+indent_size = 2
+trim_trailing_whitespace = false
