@@ -1,12 +1,9 @@
-from typing import Dict, List, Optional, Tuple
-
-def render_latency_histogram(latencies: List[float], bins: int = 20) -> str:
+def render_latency_histogram(latencies: list[float], bins: int = 20) -> str:
     if not latencies:
         return "No latency data."
     lo, hi = min(latencies), max(latencies)
     if hi <= lo:
         return f"Histogram: single value {lo:.4f}s"
-
 
     width = 40
     counts = [0] * bins
@@ -15,7 +12,6 @@ def render_latency_histogram(latencies: List[float], bins: int = 20) -> str:
         if j == bins:
             j -= 1
         counts[j] += 1
-
 
     peak = max(counts)
     lines = []
@@ -28,12 +24,11 @@ def render_latency_histogram(latencies: List[float], bins: int = 20) -> str:
 
 
 def render_timeline(
-    timeline: Dict[int, List[Tuple[float, float, str, Optional[int]]]],
+    timeline: dict[int, list[tuple[float, float, str, int | None]]],
     width: int = 80,
 ) -> str:
     if not timeline:
         return "No timeline data."
-
 
     max_t = 0.0
     for segs in timeline.values():
@@ -42,7 +37,6 @@ def render_timeline(
                 max_t = end_rel
         if max_t <= 0:
             max_t = 1.0
-
 
     lines = ["Request Timeline (relative seconds)"]
     for worker_id in sorted(timeline.keys()):
@@ -54,5 +48,5 @@ def render_timeline(
             for k in range(a, b + 1):
                 buf[k] = "="
         lines.append(f"W{worker_id:02d} |{''.join(buf)}|")
-    lines.append(f"0s{' '*(width-6)}~ {max_t:.2f}s")
+    lines.append(f"0s{' ' * (width - 6)}~ {max_t:.2f}s")
     return "\n".join(lines)

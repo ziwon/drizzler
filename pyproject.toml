@@ -3,6 +3,7 @@ name = "drizzler"
 version = "0.2.0"
 description = "Adaptive host-aware throttling + YouTube download example via yt-dlp"
 readme = "README.md"
+keywords = ["crawler", "download", "throttling"]
 authors = [
     { name = "Aaron Yoon", email = "yngpil.yoon@gmail.com" }
 ]
@@ -17,6 +18,36 @@ dependencies = [
 [project.scripts]
 drizzler = "drizzler.cli:main"
 
+[dependency-groups]
+dev = [
+    "mypy>=1.14.1",
+    "flake8>=7.1.1",
+    "pylint>=3.3.3",
+    "ruff>=0.9.1",
+    "pyright>=1.1.392.post0",
+    "pre-commit>=4.2.0",
+    "pyupgrade>=3.20.0",
+]
+format = [
+    "autopep8>=2.3.2",
+    "black>=24.10.0",
+    "yapf>=0.43.0",
+]
+test = [
+  "pytest>=8.3.4",
+  "pytest-cov>=4.0.0",
+]
+security = [
+  "safety>=3.0.0",
+  "bandit>=1.7.0",
+]
+
 [build-system]
-requires = ["uv_build>=0.8.4,<0.9.0"]
-build-backend = "uv_build"
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/drizzler"]
+
+[tool.ruff]
+lint.ignore = ["E731"]  # Allow lambda expressions

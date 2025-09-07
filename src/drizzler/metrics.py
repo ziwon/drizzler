@@ -1,20 +1,22 @@
 import math
 import logging
-from typing import List, Dict, Optional, Callable
-from collections import defaultdict
+from collections.abc import Callable
 from .models import Stats
 
 logger = logging.getLogger(__name__)
 
+
 def compute_stats(
-    latencies: List[float],
+    latencies: list[float],
     success_count: int,
     error_count: int,
-    status_counts: Dict[int, int],
-    metrics_callback: Optional[Callable[[Dict], None]] = None,
+    status_counts: dict[int, int],
+    metrics_callback: Callable[[dict], None] | None = None,
 ) -> Stats:
     total = success_count + error_count
-    logger.debug(f"Computing stats: total={total}, success={success_count}, errors={error_count}")
+    logger.debug(
+        f"Computing stats: total={total}, success={success_count}, errors={error_count}"
+    )
 
     if not total:
         stats_dict = {
@@ -64,7 +66,9 @@ def compute_stats(
     std = math.sqrt(max(0.0, (sum_sq / n) - (mean * mean)))
 
     sl = sorted(latencies)
-    pct = lambda p: sl[max(0, min(n - 1, int(p * (n - 1))))]
+
+    def pct(p):
+        return sl[max(0, min(n - 1, int(p * (n - 1))))]
 
     stats_dict = {
         "total": total,
@@ -87,7 +91,7 @@ def compute_stats(
 
     logger.info(
         f"Stats computed: success={success_count}, errors={error_count}, "
-        f"mean={mean:.3f}s, p95={stats_dict['p95']:.3f}s, error_rate={stats_dict['error_rate']*100:.1f}%"
+        f"mean={mean:.3f}s, p95={stats_dict['p95']:.3f}s, error_rate={stats_dict['error_rate'] * 100:.1f}%"
     )
 
     return Stats(**stats_dict)

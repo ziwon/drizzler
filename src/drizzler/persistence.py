@@ -1,16 +1,20 @@
 import logging
 import json
 import os
-from typing import Dict, Any
 from .throttling import BoundedTokenBucket, HostCircuitBreaker
 
 logger = logging.getLogger(__name__)
+
 
 class StateManager:
     def __init__(self, state_file: str = "drizzler_state.json"):
         self.state_file = state_file
 
-    def save_state(self, buckets: Dict[str, BoundedTokenBucket], breakers: Dict[str, HostCircuitBreaker]):
+    def save_state(
+        self,
+        buckets: dict[str, BoundedTokenBucket],
+        breakers: dict[str, HostCircuitBreaker],
+    ):
         state = {
             "buckets": {name: bucket.to_dict() for name, bucket in buckets.items()},
             "breakers": {name: breaker.to_dict() for name, breaker in breakers.items()},
@@ -27,7 +31,7 @@ class StateManager:
             logger.info("No state file found. Starting fresh.")
             return {}, {}
         try:
-            with open(self.state_file, "r") as f:
+            with open(self.state_file) as f:
                 state = json.load(f)
             buckets = {
                 name: BoundedTokenBucket.from_dict(data, **bucket_config(name))
@@ -37,7 +41,9 @@ class StateManager:
                 name: HostCircuitBreaker.from_dict(data, **breaker_config(name))
                 for name, data in state.get("breakers", {}).items()
             }
-            logger.info(f"Loaded state for {len(buckets)} buckets and {len(breakers)} breakers")
+            logger.info(
+                f"Loaded state for {len(buckets)} buckets and {len(breakers)} breakers"
+            )
             return buckets, breakers
         except Exception as e:
             logger.error(f"Failed to load state: {e}")

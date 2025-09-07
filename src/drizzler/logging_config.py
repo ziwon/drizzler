@@ -1,6 +1,6 @@
-# drizzler/logging_config.py
 import logging
 import sys
+
 
 def setup_logging(level: str = "INFO", log_file: str = None) -> logging.Logger:
     """
@@ -18,7 +18,7 @@ def setup_logging(level: str = "INFO", log_file: str = None) -> logging.Logger:
     # Create formatter
     formatter = logging.Formatter(
         fmt="%(asctime)s | %(levelname)-8s | %(name)-20s | %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S"
+        datefmt="%Y-%m-%d %H:%M:%S",
     )
 
     # Create console handler (stdout)
@@ -37,7 +37,9 @@ def setup_logging(level: str = "INFO", log_file: str = None) -> logging.Logger:
         if issubclass(exc_type, KeyboardInterrupt):
             sys.__excepthook__(exc_type, exc_value, exc_traceback)
             return
-        logger.error("Uncaught exception", exc_info=(exc_type, exc_value, exc_traceback))
+        logger.error(
+            "Uncaught exception", exc_info=(exc_type, exc_value, exc_traceback)
+        )
 
     sys.excepthook = handle_exception
 

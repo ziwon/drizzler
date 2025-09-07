@@ -1,11 +1,9 @@
 #!/usr/bin/env python3
-# cli.py — Full-featured CLI for Drizzler
 
 import argparse
 import asyncio
 import logging
 import os
-from typing import List
 
 from drizzler.core import RequestDrizzler
 from drizzler.logging_config import setup_logging
@@ -90,7 +88,7 @@ async def run():
 
     # Validate: if --simulate, disable all writes
     if args.simulate:
-        logging.info("▶️ --simulate enabled: disabling all file writes.")
+        logging.info("--simulate enabled: disabling all file writes.")
         download_video = False
         download_info = False
         download_thumbnail = False
@@ -107,7 +105,9 @@ async def run():
         urls=args.urls,
         per_host_rate=args.rate,
         global_concurrency=args.concurrency,
-        request_timeout_s=60.0 if (download_video or download_info or download_thumbnail) else 30.0,
+        request_timeout_s=60.0
+        if (download_video or download_info or download_thumbnail)
+        else 30.0,
         max_retries=3,
         slow_start_ramp_up_s=15.0,
         state_file="drizzler_state.json",
@@ -135,8 +135,10 @@ async def run():
             f"Mean latency: {stats.mean:.2f}s"
         )
 
+
 def main():
     asyncio.run(run())
+
 
 if __name__ == "__main__":
     main()

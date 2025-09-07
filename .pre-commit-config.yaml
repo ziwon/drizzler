@@ -1,0 +1,110 @@
+# Exclude directories from all hooks
+exclude: ^(examples/|\.git/|\.venv/|venv/|build/|dist/)
+
+# Set default language version
+default_language_version:
+  python: python3.11
+
+repos:
+# Python Linting and Formatting
+- repo: local
+  hooks:
+    - id: ruff
+      name: Ruff (lint)
+      entry: uv run ruff
+      language: system
+      args: [check, --fix, --exit-non-zero-on-fix]
+      types: [python]
+      pass_filenames: true
+      require_serial: false
+    - id: ruff-format
+      name: Ruff (format)
+      entry: uv run ruff
+      language: system
+      args: [format]
+      types: [python]
+      pass_filenames: true
+      require_serial: false
+
+# Syntax Upgrades
+- repo: local
+  hooks:
+    - id: pyupgrade
+      name: Upgrade Python syntax
+      entry: uv run pyupgrade
+      language: system
+      args: [--py311-plus]
+      types: [python]
+      pass_filenames: true
+      require_serial: false
+
+# Static Type Checking (disabled for now due to type errors)
+# - repo: local
+#   hooks:
+#     - id: mypy
+#       name: mypy
+#       entry: uv run mypy
+#       language: system
+#       args: [--no-incremental, --ignore-missing-imports]
+#       types: [python]
+
+# General File Formatting and Checks
+- repo: https://github.com/pre-commit/pre-commit-hooks
+  rev: v5.0.0
+  hooks:
+    - id: check-merge-conflict
+    - id: check-added-large-files
+      args: [--maxkb=5120, --enforce-all]
+    - id: debug-statements
+    - id: check-symlinks
+    - id: end-of-file-fixer
+    - id: trailing-whitespace
+      args: [--markdown-linebreak-ext=md]
+    - id: check-yaml
+      args: [--allow-multiple-documents]
+    - id: check-toml
+    - id: check-json
+    - id: check-ast
+    - id: check-builtin-literals
+    - id: check-case-conflict
+    - id: check-docstring-first
+    - id: detect-private-key
+    - id: mixed-line-ending
+      args: [--fix=lf]
+    - id: name-tests-test
+      args: [--pytest-test-first]
+    - id: requirements-txt-fixer
+
+# uv integration
+- repo: https://github.com/astral-sh/uv-pre-commit
+  rev: 0.7.20
+  hooks:
+    - id: uv-lock
+      name: Ensure uv.lock is up to date
+    - id: uv-export
+      name: Ensure requirements.txt is in sync with uv.lock
+      args: [--frozen, --no-emit-project]
+
+# Check for common issues in Python code
+- repo: https://github.com/pre-commit/pygrep-hooks
+  rev: v1.10.0
+  hooks:
+    - id: python-check-blanket-noqa
+    - id: python-check-blanket-type-ignore
+    - id: python-no-eval
+    - id: python-no-log-warn
+    - id: python-use-type-annotations
+
+# Markdown linting
+- repo: https://github.com/igorshubovych/markdownlint-cli
+  rev: v0.43.0
+  hooks:
+    - id: markdownlint
+      args: [--fix, --disable, MD013, MD033]
+
+# Check for secrets
+- repo: https://github.com/Yelp/detect-secrets
+  rev: v1.5.0
+  hooks:
+    - id: detect-secrets
+      exclude: ^(.*\.lock|package-lock\.json)$

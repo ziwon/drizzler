@@ -1,10 +1,10 @@
 import asyncio
 import random
 import logging
-from typing import Optional
 
 
 logger = logging.getLogger(__name__)
+
 
 class HostCircuitBreaker:
     def __init__(self, failure_threshold: int = 5, cooldown_s: float = 60.0):
@@ -13,7 +13,9 @@ class HostCircuitBreaker:
         self.cooldown_until = 0.0
         self.failure_threshold = failure_threshold
         self.cooldown_s = cooldown_s
-        logger.debug(f"Initialized circuit breaker: threshold={failure_threshold}, cooldown={cooldown_s}s")
+        logger.debug(
+            f"Initialized circuit breaker: threshold={failure_threshold}, cooldown={cooldown_s}s"
+        )
 
     def can_attempt(self) -> bool:
         return asyncio.get_event_loop().time() >= self.cooldown_until
@@ -22,7 +24,10 @@ class HostCircuitBreaker:
         self.failures += 1
         self.last_failure = asyncio.get_event_loop().time()
         if self.failures >= self.failure_threshold:
-            logger.debug(f"Circuit breaker OPEN until {self.cooldown_until:.2f} (now={now:.2f})")
+            now = asyncio.get_event_loop().time()
+            logger.debug(
+                f"Circuit breaker OPEN until {self.cooldown_until:.2f} (now={now:.2f})"
+            )
             self.cooldown_until = self.last_failure + self.cooldown_s
             self.failures = 0
 
@@ -60,15 +65,17 @@ class BoundedTokenBucket:
         self.rate = rate_per_sec
         self.burst = burst
         self.q: asyncio.Queue = asyncio.Queue(maxsize=burst)
-        self._task: Optional[asyncio.Task] = None
+        self._task: asyncio.Task | None = None
         self._stop = asyncio.Event()
         self.jitter_ratio = jitter_ratio
         self.ramp_up_s = ramp_up_s
-        self._start_t: Optional[float] = None
+        self._start_t: float | None = None
         self.name = name
         self._cooldown_until: float = 0.0
         self._cooldown_lock = asyncio.Lock()
-        logger.debug(f"Created token bucket '{name}': rate={rate_per_sec}, burst={burst}, ramp_up={ramp_up_s}s")
+        logger.debug(
+            f"Created token bucket '{name}': rate={rate_per_sec}, burst={burst}, ramp_up={ramp_up_s}s"
+        )
 
     async def start(self) -> None:
         if self._task is None:
@@ -104,7 +111,9 @@ class BoundedTokenBucket:
         """Adaptive rate control"""
         old_rate = self.rate
         self.rate = max(0.1, self.rate * multiplier)
-        logger.info(f"Bucket '{self.name}' rate adjusted: {old_rate:.2f} → {self.rate:.2f} (x{multiplier})")
+        logger.info(
+            f"Bucket '{self.name}' rate adjusted: {old_rate:.2f} → {self.rate:.2f} (x{multiplier})"
+        )
 
     def _current_rate(self) -> float:
         if self.ramp_up_s <= 0 or self._start_t is None:
@@ -113,11 +122,13 @@ class BoundedTokenBucket:
         base = 0.2 * self.rate
         r = base + (self.rate - base) * min(1.0, elapsed / self.ramp_up_s)
         final_rate = max(0.1, r)
-        logger.debug(f"Bucket '{self.name}' current rate: {final_rate:.2f} (elapsed={elapsed:.1f}s)")
+        logger.debug(
+            f"Bucket '{self.name}' current rate: {final_rate:.2f} (elapsed={elapsed:.1f}s)"
+        )
         return final_rate
 
     async def _run(self) -> None:
-        logger.debug(f"Bucket '{self.name}' background task started.")  
+        logger.debug(f"Bucket '{self.name}' background task started.")
         try:
             while not self._stop.is_set():
                 r = self._current_rate()
