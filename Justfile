@@ -120,8 +120,9 @@ docker-run *ARGS:
         {{docker_image}} --output-dir /downloads {{ARGS}}
 
 # Run Docker with URLs from file (non-interactive)
-docker-run-file file="urls.txt" *ARGS:
-    @cat {{file}} | grep -E '^https?://' | cut -d' ' -f1 | xargs docker run --rm \
+docker-run-file name="drizzler" file="urls.txt" *ARGS:
+    cat {{file}} | grep -E '^https?://' | cut -d' ' -f1 | xargs docker run --rm \
+        --name {{name}} \
         -v $(pwd)/downloads:/downloads \
         -v $(pwd)/.env:/app/.env:ro \
         {{docker_image}} --output-dir /downloads {{ARGS}}

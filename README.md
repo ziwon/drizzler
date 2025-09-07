@@ -55,9 +55,19 @@ Forget one-file toy scripts that hammer servers and get you blocked. **drizzler 
   `-write-video`, `--write-info-json`, `--write-thumbnail`, `--simulate`, `--output-dir`, `--concurrency`, `--rate`, `--debug`, `--log-file`
    - Install once, run anywhere: `drizzler "https://youtube.com/..." --write-video`
 
+## Quickstart
+```bash
+docker run ghcr.io/ziwon/drizzler:latest \
+  "https://www.youtube.com/watch?v=SYRlTISvjww" \
+  "https://www.youtube.com/watch?v=yebNIHKAC4A" \
+  "https://www.youtube.com/watch?v=cPJiPphm8tg" \
+  --simulate
+```
+
 ## Prerequisites
 - Python 3.11+
 - [uv](https://github.com/astral-sh/uv) installed (`pipx install uv` or see repo)
+- [justfile](https://github.com/casey/just) installed (optional)
 
 ## Setup
 ```bash
