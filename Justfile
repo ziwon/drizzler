@@ -119,9 +119,9 @@ docker-run *ARGS:
         -v $(pwd)/.env:/app/.env:ro \
         {{docker_image}} {{ARGS}}
 
-# Run Docker with URLs from file
+# Run Docker with URLs from file (non-interactive)
 docker-run-file file="urls.txt" *ARGS:
-    @cat {{file}} | xargs docker run -it --rm \
+    @cat {{file}} | grep -E '^https?://' | cut -d' ' -f1 | xargs docker run --rm \
         -v $(pwd)/downloads:/downloads \
         -v $(pwd)/.env:/app/.env:ro \
         {{docker_image}} {{ARGS}}
