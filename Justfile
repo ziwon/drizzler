@@ -117,14 +117,14 @@ docker-run *ARGS:
     docker run -it --rm \
         -v $(pwd)/downloads:/downloads \
         -v $(pwd)/.env:/app/.env:ro \
-        {{docker_image}} {{ARGS}}
+        {{docker_image}} --output-dir /downloads {{ARGS}}
 
 # Run Docker with URLs from file (non-interactive)
 docker-run-file file="urls.txt" *ARGS:
     @cat {{file}} | grep -E '^https?://' | cut -d' ' -f1 | xargs docker run --rm \
         -v $(pwd)/downloads:/downloads \
         -v $(pwd)/.env:/app/.env:ro \
-        {{docker_image}} {{ARGS}}
+        {{docker_image}} --output-dir /downloads {{ARGS}}
 
 # Run Docker container in background
 docker-run-daemon name="drizzler" *ARGS:
@@ -133,7 +133,7 @@ docker-run-daemon name="drizzler" *ARGS:
         -v $(pwd)/downloads:/downloads \
         -v $(pwd)/.env:/app/.env:ro \
         --restart unless-stopped \
-        {{docker_image}} {{ARGS}}
+        {{docker_image}} --output-dir /downloads {{ARGS}}
 
 # Stop and remove Docker container
 docker-stop name="drizzler":
@@ -216,7 +216,7 @@ docker-run-remote *ARGS:
     docker run -it --rm \
         -v $(pwd)/downloads:/downloads \
         -v $(pwd)/.env:/app/.env:ro \
-        {{docker_registry}}/{{docker_image}} {{ARGS}}
+        {{docker_registry}}/{{docker_image}} --output-dir /downloads {{ARGS}}
 
 # ============================================================================
 # Development Tools

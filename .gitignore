@@ -20,8 +20,11 @@ uv.lock
 Thumbs.db
 
 # Downloaded files
+downloads/
 *.webm
 *.mp4
 *.mkv
 *.part
 *.tmp
+*.info.json
+drizzler_state.json
