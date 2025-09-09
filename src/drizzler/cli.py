@@ -38,6 +38,32 @@ def parse_args():
         help="Download thumbnail image",
     )
     parser.add_argument(
+        "--write-subs",
+        action="store_true",
+        help="Download subtitles/captions",
+    )
+    parser.add_argument(
+        "--write-txt",
+        action="store_true",
+        help="Extract text only from captions (removes timestamps and metadata)",
+    )
+    parser.add_argument(
+        "--summarize",
+        action="store_true",
+        help="Generate AI summary of caption text in markdown format",
+    )
+    parser.add_argument(
+        "--llm-provider",
+        choices=["ollama", "transformers"],
+        default="ollama",
+        help="LLM provider for summarization (default: ollama)",
+    )
+    parser.add_argument(
+        "--llm-model",
+        default="qwen2.5:3b",
+        help="Model to use for summarization (default: qwen2.5:3b for Ollama)",
+    )
+    parser.add_argument(
         "--simulate",
         action="store_true",
         help="Simulate only — fetch webpage or metadata, but do NOT download files",
@@ -92,10 +118,21 @@ async def run():
         download_video = False
         download_info = False
         download_thumbnail = False
+        download_subs = False
+        download_txt = False
+        summarize = False
     else:
         download_video = args.write_video
         download_info = args.write_info_json
         download_thumbnail = args.write_thumbnail
+        download_subs = args.write_subs
+        download_txt = args.write_txt
+        summarize = args.summarize
+
+    # If summarize is enabled, we need text extraction
+    if summarize and not download_txt:
+        download_txt = True
+        logging.info("--summarize enabled: automatically enabling text extraction")
 
     # Ensure output dir exists
     os.makedirs(args.output_dir, exist_ok=True)
@@ -106,7 +143,14 @@ async def run():
         per_host_rate=args.rate,
         global_concurrency=args.concurrency,
         request_timeout_s=60.0
-        if (download_video or download_info or download_thumbnail)
+        if (
+            download_video
+            or download_info
+            or download_thumbnail
+            or download_subs
+            or download_txt
+            or summarize
+        )
         else 30.0,
         max_retries=3,
         slow_start_ramp_up_s=15.0,
@@ -115,6 +159,11 @@ async def run():
         download_video=download_video,
         download_info=download_info,
         download_thumbnail=download_thumbnail,
+        download_subs=download_subs,
+        download_txt=download_txt,
+        summarize=summarize,
+        llm_provider=args.llm_provider,
+        llm_model=args.llm_model,
         output_dir=args.output_dir,
     )
 

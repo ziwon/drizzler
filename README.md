@@ -18,6 +18,8 @@ Forget one-file toy scripts that hammer servers and get you blocked. **drizzler 
 - Dual-Mode Engine
   - Fetch webpages (HTTP)
   - Download videos + metadata + thumbnails (via yt-dlp)
+  - Extract captions/subtitles as plain text
+  - Generate AI summaries using open-source LLMs
   - All under the same adaptive throttling umbrella.
 
 - YouTube-Optimized by Design
@@ -68,6 +70,7 @@ docker run ghcr.io/ziwon/drizzler:latest \
 - Python 3.11+
 - [uv](https://github.com/astral-sh/uv) installed (`pipx install uv` or see repo)
 - [justfile](https://github.com/casey/just) installed (optional)
+- [Ollama](https://ollama.ai) installed (optional, for AI summarization)
 
 ## Setup
 ```bash
@@ -98,6 +101,61 @@ drizzler \
   --concurrency 3 \
   --rate 0.8 \
   --debug
+```
+
+Download Videos with Captions/Subtitles
+```
+drizzler \
+  "https://www.youtube.com/watch?v=Ljf671BSu2g" \
+  --write-video \
+  --write-subs \
+  --output-dir ./downloads \
+  --rate 0.5
+```
+
+Extract Text Only from Captions (removes timestamps)
+```
+drizzler \
+  "https://www.youtube.com/watch?v=JvvQTFqWv-U" \
+  --write-txt \
+  --output-dir ./downloads
+```
+
+Download Both Subtitles and Extracted Text
+```
+drizzler \
+  "https://www.youtube.com/watch?v=Ljf671BSu2g" \
+  --write-subs \
+  --write-txt \
+  --output-dir ./downloads
+```
+
+Generate AI Summary with Ollama (Requires Ollama Running)
+```
+# First, install and run Ollama with a model
+ollama pull qwen2.5:3b  # Multilingual model (Chinese/English/Korean)
+ollama serve  # Run in another terminal
+
+# Then use drizzler with summarization
+drizzler \
+  "https://www.youtube.com/watch?v=JvvQTFqWv-U" \
+  --summarize \
+  --llm-model qwen2.5:3b \
+  --output-dir ./downloads
+```
+
+Alternative Models for Summarization
+```
+# For Chinese content
+ollama pull qwen2.5:7b
+ollama pull chatglm3:6b
+
+# For general multilingual
+ollama pull gemma2:2b
+ollama pull llama3.2:3b
+
+# Use with drizzler
+drizzler <url> --summarize --llm-model gemma2:2b
 ```
 
 Simulate Only (Metadata Extraction, No File Writes)
@@ -181,7 +239,7 @@ W02 |======================================                                     
 ## CLI Options
 ```
 $ drizzler --help
-usage: drizzler [-h] [--write-video] [--write-info-json] [--write-thumbnail] [--simulate] [-o OUTPUT_DIR] [--concurrency CONCURRENCY] [--rate RATE] [--debug] [--log-file LOG_FILE] urls [urls ...]
+usage: drizzler [-h] [--write-video] [--write-info-json] [--write-thumbnail] [--write-subs] [--write-txt] [--summarize] [--llm-provider {ollama,transformers}] [--llm-model MODEL] [--simulate] [-o OUTPUT_DIR] [--concurrency CONCURRENCY] [--rate RATE] [--debug] [--log-file LOG_FILE] urls [urls ...]
 
 🌧️ Drizzler: Adaptive HTTP/Video Downloader with Host-Aware Throttling
 
@@ -193,6 +251,11 @@ options:
   --write-video         Download actual video file (via yt-dlp) (default: False)
   --write-info-json     Write video metadata to .info.json file (default: False)
   --write-thumbnail     Download thumbnail image (default: False)
+  --write-subs         Download subtitles/captions (default: False)
+  --write-txt          Extract text only from captions (removes timestamps and metadata) (default: False)
+  --summarize          Generate AI summary of caption text in markdown format (default: False)
+  --llm-provider       LLM provider for summarization: ollama or transformers (default: ollama)
+  --llm-model          Model to use for summarization (default: qwen2.5:3b)
   --simulate            Simulate only — fetch webpage or metadata, but do NOT download files (default: False)
   -o OUTPUT_DIR, --output-dir OUTPUT_DIR
                         Output directory for downloads (default: ./downloads)

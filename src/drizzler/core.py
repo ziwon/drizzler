@@ -11,6 +11,7 @@ from .throttling import BoundedTokenBucket, HostCircuitBreaker
 from .metrics import compute_stats
 from .rendering import render_latency_histogram, render_timeline
 from .persistence import StateManager
+from .summarizer import TextSummarizer
 
 
 logger = logging.getLogger(__name__)
@@ -38,6 +39,11 @@ class RequestDrizzler:
         download_video: bool = False,  # --write-video
         download_info: bool = False,  # --write-info-json
         download_thumbnail: bool = False,  # --write-thumbnail
+        download_subs: bool = False,  # --write-subs
+        download_txt: bool = False,  # --write-txt
+        summarize: bool = False,  # --summarize
+        llm_provider: str = "ollama",  # LLM provider
+        llm_model: str = "qwen2.5:3b",  # LLM model
         output_dir: str = "./downloads",  # -o
     ) -> None:
         self.urls = [u.strip() for u in urls]
@@ -66,6 +72,11 @@ class RequestDrizzler:
         self.download_video = download_video
         self.download_info = download_info
         self.download_thumbnail = download_thumbnail
+        self.download_subs = download_subs
+        self.download_txt = download_txt
+        self.summarize = summarize
+        self.llm_provider = llm_provider
+        self.llm_model = llm_model
         self.output_dir = output_dir
 
         import os
@@ -175,6 +186,138 @@ class RequestDrizzler:
             return None, None, {}
 
     # ────────────────────────────────
+    # Summary Generation
+    # ────────────────────────────────
+    def _generate_summary(self, video_id: str, lang_code: str, text: str) -> None:
+        """Generate AI summary of the text content"""
+        try:
+            logger.info(f"Generating summary for {video_id}.{lang_code}")
+
+            # Initialize summarizer
+            summarizer = TextSummarizer(
+                provider=self.llm_provider, model=self.llm_model
+            )
+
+            # Generate summary
+            summary = summarizer.summarize(text, lang=lang_code)
+
+            if summary:
+                # Save summary as markdown file
+                summary_file = f"{self.output_dir}/{video_id}.{lang_code}.summary.md"
+                with open(summary_file, "w", encoding="utf-8") as f:
+                    # Add metadata header
+                    f.write("---\n")
+                    f.write(f"video_id: {video_id}\n")
+                    f.write(f"language: {lang_code}\n")
+                    f.write(f"model: {self.llm_model}\n")
+                    f.write(f"provider: {self.llm_provider}\n")
+                    f.write("---\n\n")
+                    f.write(summary)
+
+                logger.info(f"Summary saved to {summary_file}")
+            else:
+                logger.warning(f"Failed to generate summary for {video_id}.{lang_code}")
+
+        except Exception as e:
+            logger.error(f"Error generating summary: {e}")
+
+    # ────────────────────────────────
+    # Subtitle Processing
+    # ────────────────────────────────
+    def _extract_text_from_subtitles(self, video_id: str) -> None:
+        """Extract text only from VTT/SRT files and save as .txt"""
+        import os
+        import re
+        import glob
+
+        # Find all subtitle files for this video
+        subtitle_patterns = [
+            f"{self.output_dir}/{video_id}.*.vtt",
+            f"{self.output_dir}/{video_id}.*.srt",
+        ]
+
+        for pattern in subtitle_patterns:
+            for subtitle_file in glob.glob(pattern):
+                try:
+                    with open(subtitle_file, encoding="utf-8") as f:
+                        content = f.read()
+
+                    # Extract language code from filename (e.g., video_id.en.vtt -> en)
+                    base_name = os.path.basename(subtitle_file)
+                    parts = base_name.rsplit(".", 2)
+                    if len(parts) >= 3:
+                        lang_code = parts[1]
+                    else:
+                        lang_code = "unknown"
+
+                    # Process VTT format
+                    if subtitle_file.endswith(".vtt"):
+                        # Remove WEBVTT header
+                        content = re.sub(
+                            r"^WEBVTT.*?\n\n", "", content, flags=re.DOTALL
+                        )
+                        # Remove timestamps and cue settings
+                        content = re.sub(
+                            r"^\d{2}:\d{2}:\d{2}\.\d{3}.*?$",
+                            "",
+                            content,
+                            flags=re.MULTILINE,
+                        )
+                        # Remove position/align tags
+                        content = re.sub(r"</?[^>]+>", "", content)
+                        # Remove cue identifiers (numbers at the beginning of lines)
+                        content = re.sub(r"^\d+\s*$", "", content, flags=re.MULTILINE)
+
+                    # Process SRT format
+                    elif subtitle_file.endswith(".srt"):
+                        # Remove subtitle numbers
+                        content = re.sub(r"^\d+\s*$", "", content, flags=re.MULTILINE)
+                        # Remove timestamps
+                        content = re.sub(
+                            r"^\d{2}:\d{2}:\d{2},\d{3}.*?$",
+                            "",
+                            content,
+                            flags=re.MULTILINE,
+                        )
+                        # Remove HTML tags
+                        content = re.sub(r"</?[^>]+>", "", content)
+
+                    # Clean up the text
+                    lines = []
+                    for line in content.split("\n"):
+                        line = line.strip()
+                        if line and not line.startswith("-->"):
+                            lines.append(line)
+
+                    # Remove duplicate consecutive lines
+                    cleaned_lines = []
+                    prev_line = None
+                    for line in lines:
+                        if line != prev_line:
+                            cleaned_lines.append(line)
+                            prev_line = line
+
+                    # Save as text file
+                    text_content = "\n".join(cleaned_lines)
+                    text_file = f"{self.output_dir}/{video_id}.{lang_code}.txt"
+                    with open(text_file, "w", encoding="utf-8") as f:
+                        f.write(text_content)
+
+                    logger.info(f"Extracted text to {text_file}")
+
+                    # Generate summary if requested
+                    if self.summarize:
+                        self._generate_summary(video_id, lang_code, text_content)
+
+                    # If user only wants text, remove the original subtitle file
+                    if self.download_txt and not self.download_subs:
+                        os.remove(subtitle_file)
+                        logger.debug(f"Removed subtitle file {subtitle_file}")
+
+                except Exception as e:
+                    logger.error(f"Failed to extract text from {subtitle_file}: {e}")
+
+    # ────────────────────────────────
     # yt-dlp Download Logic
     # ────────────────────────────────
     async def _download_with_ytdlp(
@@ -187,16 +330,29 @@ class RequestDrizzler:
         def _run_ytdlp():
             import yt_dlp
 
+            # Enable subtitle download if either subs, txt, or summarize is requested
+            download_any_subs = (
+                self.download_subs or self.download_txt or self.summarize
+            )
+
             ydl_opts = {
                 "quiet": True,
                 "no_warnings": True,
                 "noplaylist": True,
                 "outtmpl": f"{self.output_dir}/%(id)s.%(ext)s",
                 "format": "best[ext=mp4]/best",  # prefer mp4
-                "writesubtitles": False,
+                "writesubtitles": download_any_subs,
+                "writeautomaticsub": download_any_subs,  # Also get auto-generated subs
+                "subtitleslangs": ["en", "ko"]
+                if download_any_subs
+                else [],  # Download English and Korean
+                "subtitlesformat": "vtt/srt/best",  # Prefer VTT, then SRT
                 "writeinfojson": self.download_info,
                 "writethumbnail": self.download_thumbnail,
                 "skip_download": not self.download_video,
+                "ignoreerrors": True,  # Continue on download errors
+                "extractor_retries": 3,  # Retry on extraction errors
+                "fragment_retries": 3,  # Retry on fragment errors
             }
 
             try:
@@ -204,6 +360,13 @@ class RequestDrizzler:
                     info = ydl.extract_info(url, download=True)
                     if info is None:
                         return False, None
+
+                    # If we need text extraction or summarization, process the subtitle files
+                    if (self.download_txt or self.summarize) and info:
+                        video_id = info.get("id")
+                        if video_id:
+                            self._extract_text_from_subtitles(video_id)
+
                     return True, info.get("url")  # actual CDN URL if downloaded
             except Exception as e:
                 logger.error(f"[W{worker_id}] yt-dlp failed for {url}: {e}")
@@ -229,8 +392,15 @@ class RequestDrizzler:
     async def _fetch_with_policy(
         self, session: aiohttp.ClientSession, url: str, worker_id: int
     ) -> None:
-        # If download_video is True, use yt-dlp instead of HTTP fetch
-        if self.download_video or self.download_info or self.download_thumbnail:
+        # If any download option is True, use yt-dlp instead of HTTP fetch
+        if (
+            self.download_video
+            or self.download_info
+            or self.download_thumbnail
+            or self.download_subs
+            or self.download_txt
+            or self.summarize
+        ):
             success, latency, host = await self._download_with_ytdlp(url, worker_id)
 
             # Record in stats
