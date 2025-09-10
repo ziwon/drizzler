@@ -142,14 +142,30 @@ drizzler \
   --summarize \
   --llm-model qwen2.5:3b \
   --output-dir ./downloads
+
+cat ./downloads/JvvQTFqWv-U.ko.summary.md
+---
+video_id: JvvQTFqWv-U
+language: ko
+model: qwen2.5:3b
+provider: ollama
+---
+
+# 동영상 내용 요약
+
+## 주요 내용
+- 뇌질환 환자 중 일부는 운동으로 병의 진행을 늦출 수 있습니다.
+- 5분에서 10분 정도의 달리기만 하면 사망률이 반으로 줄어드는 연구 결과가 있다.
+- 파킨슨병 같은 질환에서는 약보다 운동이 더 많은 효과를 보인다.
+- 고혈압이나 당뇨 등 다른 질환에서도 운동은 약을 줄일 수 있다.
+- 우울증 환자는 달리기를 시작하면 약을 줄이고, 일부는 약도 끊었다.
+
+## 상세 요약
+원문에서 언급된 주요 내용들은 다음과 같다. 뇌질환 환자들 중 일부가 운동으로 병의 진행을 늦칠 수 있다는 점이 연구 결과로 입증되었다. 예를 들어, 5분에서 10분 정도만 달리면 사망률이 반으로 줄어드는 연구 결과다. 또한 파킨슨병 같은 질환에서는 약보다 운동이 더 많은 효과를 보였으며, 고혈압이나 당뇨 환자들도 이에 해당한다. 우울증 환자는 약을 끊기 전 달리기를 시작해 약을 줄이고, 일부는 약도 떨어진 사례가 있다.
 ```
 
 Alternative Models for Summarization
 ```
-# For Chinese content
-ollama pull qwen2.5:7b
-ollama pull chatglm3:6b
-
 # For general multilingual
 ollama pull gemma2:2b
 ollama pull llama3.2:3b
