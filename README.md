@@ -10,10 +10,13 @@ Drizzler is a production-grade engine designed for high-performance scraping and
 
 Run a simulation with Docker:
 ```bash
-docker run ghcr.io/ziwon/drizzler:latest \
+docker run --rm ghcr.io/ziwon/drizzler:latest \
   "https://www.youtube.com/watch?v=SYRlTISvjww" \
   --simulate
 ```
+
+> [!IMPORTANT]
+> To save files to your host machine, you must mount a volume using `-v $(pwd)/downloads:/app/downloads`.
 
 ---
 
@@ -32,32 +35,32 @@ docker run ghcr.io/ziwon/drizzler:latest \
 
 ### 1. Web & API Fetching
 ```bash
-docker run ghcr.io/ziwon/drizzler:latest \
+docker run --rm ghcr.io/ziwon/drizzler:latest \
   "https://httpbin.org/status/200" --rate 2.0 --concurrency 5
 ```
 
 ### 2. YouTube Media Extraction
 ```bash
-# Download video, metadata, and thumbnail
-docker run ghcr.io/ziwon/drizzler:latest \
+# Save to host's ./downloads folder
+docker run --rm -v "$(pwd)/downloads:/app/downloads" ghcr.io/ziwon/drizzler:latest \
   "https://www.youtube.com/watch?v=WKY-KFCvm-A" \
   --write-video --write-info-json --write-thumbnail -o ./downloads
 ```
 
 ### 3. Subtitles & AI Summarization
 ```bash
-# Extract text and generate AI summary (requires Ollama)
-docker run ghcr.io/ziwon/drizzler:latest \
+# Extract text and save to host
+docker run --rm -v "$(pwd)/downloads:/app/downloads" ghcr.io/ziwon/drizzler:latest \
   "https://www.youtube.com/watch?v=JvvQTFqWv-U" \
   --summarize --llm-model qwen2.5:3b -o ./downloads
 ```
 
 ### 4. Playlist Processing
 ```bash
-# Automatically expands any YouTube playlist link
-docker run ghcr.io/ziwon/drizzler:latest \
+# Automatically expands and saves items to host
+docker run --rm -v "$(pwd)/downloads:/app/downloads" ghcr.io/ziwon/drizzler:latest \
   "https://www.youtube.com/playlist?list=PLoROMvodv4rMC33Ucp4aumGNn8SpjEork" \
-  --simulate
+  -o ./downloads
 ```
 
 ---
