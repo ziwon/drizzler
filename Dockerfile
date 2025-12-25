@@ -27,4 +27,4 @@ ENV PYTHONUNBUFFERED=1
 ENV PYTHONDONTWRITEBYTECODE=1
 
 # Default command
-ENTRYPOINT ["python", "-m", "drizzler.cli"]
+ENTRYPOINT ["drizzler"]

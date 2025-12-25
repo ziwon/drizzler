@@ -532,6 +532,22 @@ class RequestDrizzler:
         logger.info("Checking for playlists to expand...")
         expanded_urls = []
         import yt_dlp
+        import re
+
+        playlist_urls = []
+        for u in self.urls:
+            # Normalize watch?v=...&list=... to playlist?list=...
+            if "watch?" in u and "list=" in u:
+                match = re.search(r"list=([a-zA-Z0-9_-]+)", u)
+                if match:
+                    list_id = match.group(1)
+                    normalized = f"https://www.youtube.com/playlist?list={list_id}"
+                    logger.info(f"Normalized playlist URL: {u} -> {normalized}")
+                    playlist_urls.append(normalized)
+                else:
+                    playlist_urls.append(u)
+            else:
+                playlist_urls.append(u)
 
         ydl_opts = {
             "quiet": True,
@@ -541,7 +557,7 @@ class RequestDrizzler:
         }
 
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            for url in self.urls:
+            for url in playlist_urls:
                 if "list=" in url or "playlist" in url:
                     try:
                         logger.info(f"Expanding playlist: {url}")
