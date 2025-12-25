@@ -101,6 +101,13 @@ def parse_args():
         default=None,
         help="Optional file to write logs to (e.g., drizzler.log)",
     )
+    parser.add_argument(
+        "--no-progress",
+        action="store_false",
+        dest="use_progress_bar",
+        default=True,
+        help="Disable the terminal progress bar",
+    )
 
     return parser.parse_args()
 
@@ -162,10 +169,10 @@ async def run():
         download_subs=download_subs,
         download_txt=download_txt,
         summarize=summarize,
-        llm_provider=args.llm_provider,
         llm_model=args.llm_model,
         output_dir=args.output_dir,
         simulate=args.simulate,
+        use_progress_bar=args.use_progress_bar,
     )
 
     logging.info(

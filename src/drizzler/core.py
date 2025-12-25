@@ -13,6 +13,12 @@ from .rendering import render_latency_histogram, render_timeline
 from .persistence import StateManager
 from .summarizer import TextSummarizer
 
+try:
+    from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TimeElapsedColumn, MofNCompleteColumn
+    RICH_AVAILABLE = True
+except ImportError:
+    RICH_AVAILABLE = False
+
 
 logger = logging.getLogger(__name__)
 
@@ -46,6 +52,7 @@ class RequestDrizzler:
         llm_model: str = "qwen2.5:3b",  # LLM model
         output_dir: str = "./downloads",  # -o
         simulate: bool = False,
+        use_progress_bar: bool = True,
     ) -> None:
         self.urls = [u.strip() for u in urls]
         if deduplicate:
@@ -80,6 +87,7 @@ class RequestDrizzler:
         self.llm_model = llm_model
         self.output_dir = output_dir
         self.simulate = simulate
+        self.use_progress_bar = use_progress_bar and RICH_AVAILABLE
 
         import os
 
@@ -519,6 +527,45 @@ class RequestDrizzler:
     # Main Runner
     # ────────────────────────────────
 
+    async def _expand_playlists(self) -> list[str]:
+        """Expand playlist URLs into individual video URLs using yt-dlp."""
+        logger.info("Checking for playlists to expand...")
+        expanded_urls = []
+        import yt_dlp
+
+        ydl_opts = {
+            "quiet": True,
+            "no_warnings": True,
+            "extract_flat": True,
+            "force_generic_extractor": False,
+        }
+
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            for url in self.urls:
+                if "list=" in url or "playlist" in url:
+                    try:
+                        logger.info(f"Expanding playlist: {url}")
+                        info = ydl.extract_info(url, download=False)
+                        if "entries" in info:
+                            entries = list(info["entries"])
+                            logger.info(f"Found {len(entries)} entries in playlist")
+                            for entry in entries:
+                                video_url = entry.get("url")
+                                if not video_url:
+                                    # Try to construct URL from id
+                                    video_id = entry.get("id")
+                                    if video_id:
+                                        video_url = f"https://www.youtube.com/watch?v={video_id}"
+                                if video_url:
+                                    expanded_urls.append(video_url)
+                    except Exception as e:
+                        logger.error(f"Failed to expand playlist {url}: {e}")
+                        expanded_urls.append(url)
+                else:
+                    expanded_urls.append(url)
+
+        return expanded_urls
+
     async def run(self):
         logger.info("Starting Drizzler run...")
 
@@ -545,6 +592,12 @@ class RequestDrizzler:
                 await bucket.start()
                 logger.debug(f"Started loaded bucket: {bucket.name}")
 
+        # Expand playlists
+        self.urls = await self._expand_playlists()
+        if not self.urls:
+            logger.warning("No URLs to process after expansion.")
+            return None
+
         # Ensure all hosts are initialized
         hosts = {normalize_host(u) for u in self.urls}
         for h in hosts:
@@ -564,6 +617,20 @@ class RequestDrizzler:
                 f"Starting {len(self.urls)} requests with {self.global_concurrency} workers"
             )
 
+            # Progress Bar Setup
+            progress = None
+            task_id = None
+            if self.use_progress_bar:
+                progress = Progress(
+                    SpinnerColumn(),
+                    TextColumn("[progress.description]{task.description}"),
+                    BarColumn(),
+                    MofNCompleteColumn(),
+                    TimeElapsedColumn(),
+                )
+                progress.start()
+                task_id = progress.add_task("[cyan]Drizzling...", total=len(self.urls))
+
             async def worker(worker_id: int):
                 while not self.graceful_killer.kill_now:
                     try:
@@ -576,6 +643,8 @@ class RequestDrizzler:
                         break
                     try:
                         await self._fetch_with_policy(session, u, worker_id)
+                        if progress and task_id is not None:
+                            progress.advance(task_id)
                     finally:
                         q.task_done()
                         if self.graceful_killer.kill_now:
@@ -589,7 +658,11 @@ class RequestDrizzler:
 
             try:
                 await q.join()
+                if progress:
+                    progress.stop()
             except KeyboardInterrupt:
+                if progress:
+                    progress.stop()
                 logger.info("KeyboardInterrupt received. Cancelling workers...")
                 pass
 

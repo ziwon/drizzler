@@ -40,6 +40,8 @@ Forget one-file toy scripts that hammer servers and get you blocked. **drizzler 
    - State Persistence — resumes token buckets, cooldowns, and breakers after restart.
    - Graceful Shutdown — Ctrl+C saves progress and exits cleanly.
    - Deduplication — never fetches the same URL twice.
+   - Playlist Support — Automatically expands YouTube playlists into individual videos.
+   - Visual Progress — Real-time terminal progress bars via `rich`.
 
 - Observability & Debugging
    - Structured Logging — real-time console + optional file output.
@@ -127,6 +129,15 @@ drizzler \
   "https://www.youtube.com/watch?v=Ljf671BSu2g" \
   --write-subs \
   --write-txt \
+  --output-dir ./downloads
+```
+
+Download YouTube Playlists
+```
+# Simply provide a playlist URL, and drizzler will expand it
+drizzler \
+  "https://www.youtube.com/playlist?list=PLmU_fIn78p_S-shwQ-16yEun5WxpQ9KIn" \
+  --write-info-json \
   --output-dir ./downloads
 ```
 
@@ -279,7 +290,7 @@ options:
                         Global concurrency (reduce for video downloads) (default: 5)
   --rate RATE           Per-host rate limit (requests per second) (default: 1.0)
   --debug               Enable debug-level logging (default: False)
-  --log-file LOG_FILE   Optional file to write logs to (e.g., drizzler.log) (default: None)
+  --no-progress        Disable terminal progress bar (default: False)
 ```
 
 ## Downloading 1M URLs
