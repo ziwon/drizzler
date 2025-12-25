@@ -53,6 +53,7 @@ class RequestDrizzler:
         output_dir: str = "./downloads",  # -o
         simulate: bool = False,
         use_progress_bar: bool = True,
+        proxy: str | None = None,
     ) -> None:
         self.urls = [u.strip() for u in urls]
         if deduplicate:
@@ -88,6 +89,7 @@ class RequestDrizzler:
         self.output_dir = output_dir
         self.simulate = simulate
         self.use_progress_bar = use_progress_bar and RICH_AVAILABLE
+        self.proxy = proxy
 
         import os
 
@@ -177,7 +179,7 @@ class RequestDrizzler:
         start = now()
         headers = get_random_headers(self.default_headers)
         try:
-            async with session.get(url, headers=headers) as resp:
+            async with session.get(url, headers=headers, proxy=self.proxy) as resp:
                 content = await resp.read()  # or just: await resp.text() for HTML
                 latency = now() - start
                 headers_dict = {k: v for k, v in resp.headers.items()}
@@ -363,6 +365,7 @@ class RequestDrizzler:
                 "ignoreerrors": True,  # Continue on download errors
                 "extractor_retries": 3,  # Retry on extraction errors
                 "fragment_retries": 3,  # Retry on fragment errors
+                "proxy": self.proxy,
             }
 
             try:
@@ -554,6 +557,7 @@ class RequestDrizzler:
             "no_warnings": True,
             "extract_flat": True,
             "force_generic_extractor": False,
+            "proxy": self.proxy,
         }
 
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:

@@ -26,6 +26,7 @@ docker run --rm ghcr.io/ziwon/drizzler:latest \
 - **Intelligent Throttling**: Bounded Token Bucket with slow-start ramp-up and adaptive rate control.
 - **Resilient Design**: Exponential backoff, host-based circuit breakers, and state persistence for resume support.
 - **YouTube Optimized**: Automatic CDN host grouping and automated playlist expansion.
+- **Proxy Support**: Full support for HTTP/HTTPS proxies across all fetch and download modes.
 - **Observability**: Real-time terminal progress bars, ASCII latency histograms, and worker timelines.
 - **AI Integration**: Seamless subtitle extraction and AI summarization via Ollama/Transformers.
 
@@ -63,9 +64,17 @@ docker run --rm -v "$(pwd)/downloads:/app/downloads" ghcr.io/ziwon/drizzler:late
   -o ./downloads
 ```
 
+### 5. Proxy Usage
+```bash
+# Route all requests through a proxy server
+docker run --rm ghcr.io/ziwon/drizzler:latest \
+  "https://httpbin.org/ip" \
+  --proxy "http://user:pass@proxy-host:port"
+```
+
 ---
 
-## 🏗 Scaling to Millions (Reference Architecture)
+## 🏗 Scaling to Millions
 
 For enterprise-grade deployments, Drizzler is designed to scale horizontally across Kubernetes clusters.
 
@@ -96,6 +105,7 @@ Instead of a single giant run, split URLs into batches (e.g., 50 URLs/batch) and
 | `--simulate` | Simulation mode (no file writes). |
 | `--rate` | Request rate limit (RPS). |
 | `--concurrency` | Maximum active workers. |
+| `--proxy` | Proxy URL (e.g., http://user:pass@host:port). |
 | `--no-progress` | Disable visual UI for CI/CD. |
 
 ---

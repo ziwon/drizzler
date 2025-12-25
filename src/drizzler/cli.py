@@ -89,6 +89,17 @@ def parse_args():
         help="Per-host rate limit (requests per second)",
     )
 
+    parser.add_argument(
+        "--no-progress",
+        action="store_true",
+        help="Disable terminal progress bar",
+    )
+    parser.add_argument(
+        "--proxy",
+        type=str,
+        help="Proxy URL (e.g., http://user:pass@host:port)",
+    )
+
     # Logging & Debugging
     parser.add_argument(
         "--debug",
@@ -100,13 +111,6 @@ def parse_args():
         type=str,
         default=None,
         help="Optional file to write logs to (e.g., drizzler.log)",
-    )
-    parser.add_argument(
-        "--no-progress",
-        action="store_false",
-        dest="use_progress_bar",
-        default=True,
-        help="Disable the terminal progress bar",
     )
 
     return parser.parse_args()
@@ -172,7 +176,8 @@ async def run():
         llm_model=args.llm_model,
         output_dir=args.output_dir,
         simulate=args.simulate,
-        use_progress_bar=args.use_progress_bar,
+        use_progress_bar=not args.no_progress,
+        proxy=args.proxy,
     )
 
     logging.info(
