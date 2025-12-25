@@ -83,8 +83,8 @@ cp .env.sample .env  # edit as needed
 
 ## Usage
 Fetch Webpages (HTTP Mode)
-```
-drizzler \
+```bash
+docker run ghcr.io/ziwon/drizzler:latest \
   "https://httpbin.org/delay/1" \
   "https://httpbin.org/status/200" \
   --rate 2.0 \
@@ -93,8 +93,8 @@ drizzler \
 ```
 
 Download YouTube Videos
-```
-drizzler \
+```bash
+docker run ghcr.io/ziwon/drizzler:latest \
   "https://www.youtube.com/watch?v=WKY-KFCvm-A" \
   --write-video \
   --write-info-json \
@@ -106,8 +106,8 @@ drizzler \
 ```
 
 Download Videos with Captions/Subtitles
-```
-drizzler \
+```bash
+docker run ghcr.io/ziwon/drizzler:latest \
   "https://www.youtube.com/watch?v=Ljf671BSu2g" \
   --write-video \
   --write-subs \
@@ -116,16 +116,16 @@ drizzler \
 ```
 
 Extract Text Only from Captions (removes timestamps)
-```
-drizzler \
+```bash
+docker run ghcr.io/ziwon/drizzler:latest \
   "https://www.youtube.com/watch?v=JvvQTFqWv-U" \
   --write-txt \
   --output-dir ./downloads
 ```
 
 Download Both Subtitles and Extracted Text
-```
-drizzler \
+```bash
+docker run ghcr.io/ziwon/drizzler:latest \
   "https://www.youtube.com/watch?v=Ljf671BSu2g" \
   --write-subs \
   --write-txt \
@@ -133,10 +133,11 @@ drizzler \
 ```
 
 Download YouTube Playlists
-```
-# Simply provide a playlist URL, and drizzler will expand it
-drizzler \
-  "https://www.youtube.com/playlist?list=PLmU_fIn78p_S-shwQ-16yEun5WxpQ9KIn" \
+```bash
+# Simply provide a playlist URL, and drizzler will expand it.
+# Support for both "watch with list" and "playlist?list=" formats.
+docker run ghcr.io/ziwon/drizzler:latest \
+  "https://www.youtube.com/playlist?list=PLoROMvodv4rMC33Ucp4aumGNn8SpjEork" \
   --write-info-json \
   --output-dir ./downloads
 ```
@@ -148,7 +149,7 @@ ollama pull qwen2.5:3b  # Multilingual model (Chinese/English/Korean)
 ollama serve  # Run in another terminal
 
 # Then use drizzler with summarization
-drizzler \
+docker run ghcr.io/ziwon/drizzler:latest \
   "https://www.youtube.com/watch?v=JvvQTFqWv-U" \
   --summarize \
   --llm-model qwen2.5:3b \
@@ -186,16 +187,16 @@ drizzler <url> --summarize --llm-model gemma2:2b
 ```
 
 Simulate Only (Metadata Extraction, No File Writes)
-```
-drizzler \
+```bash
+docker run ghcr.io/ziwon/drizzler:latest \
   "https://www.youtube.com/watch?v=m0Db3CAxzsE" \
   --simulate \
   --debug
 ```
 
 Log to File + Quiet Run
-```
-drizzler \
+```bash
+docker run ghcr.io/ziwon/drizzler:latest \
   "https://www.youtube.com/watch?v=fAgAE9JmnOs" \
   --write-video \
   --log-file drizzler_run.log
