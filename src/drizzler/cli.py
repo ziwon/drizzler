@@ -165,6 +165,7 @@ async def run():
         llm_provider=args.llm_provider,
         llm_model=args.llm_model,
         output_dir=args.output_dir,
+        simulate=args.simulate,
     )
 
     logging.info(
@@ -178,10 +179,11 @@ async def run():
 
     # Final summary
     if stats is not None:
+        mean_val = stats.mean if stats.mean is not None else 0.0
         logging.info(
             f"Run completed: {stats.success} succeeded, {stats.errors} failed | "
             f"Error rate: {stats.error_rate * 100:.1f}% | "
-            f"Mean latency: {stats.mean:.2f}s"
+            f"Mean latency: {mean_val:.2f}s"
         )
 
 

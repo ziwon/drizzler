@@ -45,6 +45,7 @@ class RequestDrizzler:
         llm_provider: str = "ollama",  # LLM provider
         llm_model: str = "qwen2.5:3b",  # LLM model
         output_dir: str = "./downloads",  # -o
+        simulate: bool = False,
     ) -> None:
         self.urls = [u.strip() for u in urls]
         if deduplicate:
@@ -78,6 +79,7 @@ class RequestDrizzler:
         self.llm_provider = llm_provider
         self.llm_model = llm_model
         self.output_dir = output_dir
+        self.simulate = simulate
 
         import os
 
@@ -322,7 +324,7 @@ class RequestDrizzler:
     # ────────────────────────────────
     async def _download_with_ytdlp(
         self, url: str, worker_id: int
-    ) -> tuple[bool, float | None, int | None]:
+    ) -> tuple[bool, float | None, str | None]:
         """Download video/info/thumbnail using yt-dlp in thread pool."""
         start = now()
         loop = asyncio.get_event_loop()
@@ -349,7 +351,7 @@ class RequestDrizzler:
                 "subtitlesformat": "vtt/srt/best",  # Prefer VTT, then SRT
                 "writeinfojson": self.download_info,
                 "writethumbnail": self.download_thumbnail,
-                "skip_download": not self.download_video,
+                "skip_download": not self.download_video or self.simulate,
                 "ignoreerrors": True,  # Continue on download errors
                 "extractor_retries": 3,  # Retry on extraction errors
                 "fragment_retries": 3,  # Retry on fragment errors
@@ -357,7 +359,7 @@ class RequestDrizzler:
 
             try:
                 with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                    info = ydl.extract_info(url, download=True)
+                    info = ydl.extract_info(url, download=not self.simulate)
                     if info is None:
                         return False, None
 
@@ -400,6 +402,7 @@ class RequestDrizzler:
             or self.download_subs
             or self.download_txt
             or self.summarize
+            or self.simulate  # Force yt-dlp for simulation if it's a known video site
         ):
             success, latency, host = await self._download_with_ytdlp(url, worker_id)
 

@@ -310,7 +310,7 @@ Run drizzler as a Kubernetes Job or Deployment (depending on use case) with opti
 └── [Pod N] ...
 ```
 
-#### STEP 1: CONTAINERIZE DRIZZLERContainerize dizzler
+#### STEP 1: Containerize drizzler
 ```Dockerfile
 FROM python:3.11-slim
 
@@ -325,7 +325,7 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Install uv
-RUN pip install --no-cache-dir uvc
+RUN pip install --no-cache-dir uv
 
 COPY pyproject.toml uv.lock README.md ./
 COPY src/ ./src/
@@ -374,7 +374,7 @@ spec:
   completions: 1
   backoffLimit: 2
   template:
-    meta
+    metadata:
       labels:
         app: drizzler
     spec:
@@ -436,7 +436,7 @@ Perfectly balanced → 64 pods per node → 192 pods total
 ```yaml
 apiVersion: v1
 kind: PersistentVolumeClaim
-meta
+metadata:
   name: drizzler-downloads-pvc
 spec:
   accessModes:
@@ -449,7 +449,7 @@ spec:
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
-meta
+metadata:
   name: drizzler-logs-pvc
 spec:
   accessModes:

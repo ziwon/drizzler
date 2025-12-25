@@ -14,6 +14,7 @@ RUN apt-get update && apt-get install -y \
 RUN pip install --no-cache-dir uv
 
 COPY pyproject.toml uv.lock README.md ./
+COPY .env.example .env
 COPY src/ ./src/
 
 RUN uv pip install --system --no-cache -e .
