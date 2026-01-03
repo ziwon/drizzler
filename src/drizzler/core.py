@@ -3,6 +3,7 @@ import aiohttp
 import random
 import logging
 
+from typing import Callable
 from collections.abc import Iterable
 from collections import defaultdict
 from .models import TimelineType, MetricsCallback
@@ -54,6 +55,7 @@ class RequestDrizzler:
         simulate: bool = False,
         use_progress_bar: bool = True,
         proxy: str | None = None,
+        progress_callback: Callable[[int, int, int], None] | None = None,
     ) -> None:
         self.urls = [u.strip() for u in urls]
         if deduplicate:
@@ -90,6 +92,7 @@ class RequestDrizzler:
         self.simulate = simulate
         self.use_progress_bar = use_progress_bar and RICH_AVAILABLE
         self.proxy = proxy
+        self.progress_callback = progress_callback
 
         import os
 
@@ -665,6 +668,9 @@ class RequestDrizzler:
                         await self._fetch_with_policy(session, u, worker_id)
                         if progress and task_id is not None:
                             progress.advance(task_id)
+                        if self.progress_callback:
+                            completed = self.success_count + self.error_count
+                            self.progress_callback(completed, len(self.urls), worker_id)
                     finally:
                         q.task_done()
                         if self.graceful_killer.kill_now:

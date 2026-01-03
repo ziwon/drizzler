@@ -227,6 +227,29 @@ docker-run-remote *ARGS:
 dev *ARGS:
     uv run python -m drizzler.cli --debug {{ARGS}}
 
+# ============================================================================
+# SaaS / Web Commands
+# ============================================================================
+
+# Run the FastAPI backend
+api:
+    uv run uvicorn drizzler.api.main:app --reload --host 0.0.0.0 --port 8000
+
+# Run the Vite frontend
+ui:
+    cd ui && npm run dev
+
+# Run both backend and frontend (for development)
+web:
+    @just -j 2 api ui
+
+# Deploy locally: build UI and start the unified server
+deploy-local:
+    @echo "Building UI..."
+    cd ui && npm install && npm run build
+    @echo "Starting Drizzler Web SaaS..."
+    uv run uvicorn drizzler.api.main:app --host 0.0.0.0 --port 8000
+
 # Open Python REPL with project imports
 repl:
     uv run python -c "from drizzler import *; import asyncio; import aiohttp"

@@ -1,0 +1,127 @@
+name: Build and Push Docker Images
+
+on:
+  push:
+    branches: [main, develop]
+    paths-ignore:
+      - 'docs/**'
+      - '**.md'
+  workflow_dispatch:
+    inputs:
+      app:
+        description: 'App to build'
+        required: false
+        default: 'drizzler'
+        type: choice
+        options:
+          - drizzler
+
+env:
+  REGISTRY: harbor.home.local
+  BUILDKIT_HOST: tcp://buildkitd.buildkit.svc.cluster.local:1234
+  REPO: ziwon/drizzler
+
+jobs:
+  prepare:
+    runs-on: homelab-gh
+    outputs:
+      apps: ${{ steps.apps.outputs.matrix }}
+    steps:
+      - id: apps
+        name: Determine apps to build
+        run: |
+          # Drizzler is currently a single-app repository
+          echo 'matrix=["drizzler"]' >> $GITHUB_OUTPUT
+
+  build:
+    needs: prepare
+    runs-on: homelab-gh
+    strategy:
+      matrix:
+        app: ${{ fromJson(needs.prepare.outputs.apps) }}
+      fail-fast: false
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up build metadata
+        id: meta
+        run: |
+          if [ "${{ github.ref_type }}" == "tag" ]; then
+            VERSION="${{ github.ref_name }}"
+          else
+            VERSION="${{ github.ref_name }}-$(git rev-parse --short HEAD)"
+          fi
+
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "commit=$(git rev-parse HEAD)" >> $GITHUB_OUTPUT
+          echo "date=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> $GITHUB_OUTPUT
+
+          IMAGE_BASE="${{ env.REGISTRY }}/${{ env.REPO }}"
+          echo "image_base=${IMAGE_BASE}" >> $GITHUB_OUTPUT
+
+          echo "tags<<EOF" >> $GITHUB_OUTPUT
+          echo "${IMAGE_BASE}:${VERSION}" >> $GITHUB_OUTPUT
+          if [ "${{ github.ref }}" == "refs/heads/main" ]; then
+            echo "${IMAGE_BASE}:latest" >> $GITHUB_OUTPUT
+          fi
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Set up Docker Buildx with remote BuildKit
+        uses: docker/setup-buildx-action@v3
+        with:
+          driver: remote
+          endpoint: ${{ env.BUILDKIT_HOST }}
+
+      - name: Login to Harbor
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: '${{ secrets.HARBOR_USERNAME }}'
+          password: '${{ secrets.HARBOR_PASSWORD }}'
+
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          build-args: |
+            VERSION=${{ steps.meta.outputs.version }}
+            COMMIT=${{ steps.meta.outputs.commit }}
+            BUILD_DATE=${{ steps.meta.outputs.date }}
+          cache-from: type=registry,ref=${{ env.REGISTRY }}/${{ env.REPO }}:cache
+          cache-to: type=registry,ref=${{ env.REGISTRY }}/${{ env.REPO }}:cache,mode=max
+
+      - name: Update k8s manifest
+        uses: restack/actions/actions/k8s-manifest-updater@v1
+        with:
+          app_id: ${{ secrets.APP_ID }}
+          private_key: ${{ secrets.APP_PRIVATE_KEY }}
+          installation_id: ${{ secrets.APP_INSTALLATION_ID }}
+          manifest_repo: 'ziwon/homelab'
+          manifest_path: 'platform/stacks/05-workloads/overlays/home/deepfx.yaml'
+          image: ${{ steps.meta.outputs.version }}
+          yaml_path: 'apps[name=deepfx].source.helm.values'
+          nested_yaml_path: 'drizzler.image.tag'
+          branch: main
+          create_pr: false
+
+      - name: Image summary
+        run: |
+          echo "### ${{ matrix.app }} Image Built Successfully :rocket:" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**App:** \`${{ matrix.app }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Tags:**" >> $GITHUB_STEP_SUMMARY
+          while IFS= read -r tag; do
+            echo "- \`${tag}\`" >> $GITHUB_STEP_SUMMARY
+          done <<< "${{ steps.meta.outputs.tags }}"
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Metadata:**" >> $GITHUB_STEP_SUMMARY
+          echo "- Version: \`${{ steps.meta.outputs.version }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- Commit: \`${{ steps.meta.outputs.commit }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- Build Date: \`${{ steps.meta.outputs.date }}\`" >> $GITHUB_STEP_SUMMARY

@@ -4,6 +4,10 @@
 
 Drizzler is a production-grade engine designed for high-performance scraping and media extraction. It features intelligent throttling, state persistence, and real-time observability to handle millions of requests without triggering rate limits.
 
+<p align="center">
+  <img src="docs/screencapture.png" alt="Drizzler Web Console" width="800" />
+</p>
+
 ---
 
 ## 🚀 Quickstart

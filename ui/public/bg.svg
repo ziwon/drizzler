@@ -1,0 +1,109 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080" preserveAspectRatio="xMidYMid slice">
+  <defs>
+    <!-- Vibrant Gradient Definitions -->
+    <radialGradient id="glow1" cx="15%" cy="25%" r="45%" fx="15%" fy="25%">
+      <stop offset="0%" stop-color="#a855f7" stop-opacity="0.35"/>
+      <stop offset="40%" stop-color="#9333ea" stop-opacity="0.15"/>
+      <stop offset="100%" stop-color="#a855f7" stop-opacity="0"/>
+    </radialGradient>
+
+    <radialGradient id="glow2" cx="85%" cy="15%" r="40%" fx="85%" fy="15%">
+      <stop offset="0%" stop-color="#d946ef" stop-opacity="0.3"/>
+      <stop offset="50%" stop-color="#c026d3" stop-opacity="0.1"/>
+      <stop offset="100%" stop-color="#d946ef" stop-opacity="0"/>
+    </radialGradient>
+
+    <radialGradient id="glow3" cx="50%" cy="95%" r="60%" fx="50%" fy="95%">
+      <stop offset="0%" stop-color="#06b6d4" stop-opacity="0.4"/>
+      <stop offset="30%" stop-color="#0891b2" stop-opacity="0.2"/>
+      <stop offset="100%" stop-color="#06b6d4" stop-opacity="0"/>
+    </radialGradient>
+
+    <radialGradient id="glow4" cx="70%" cy="40%" r="35%" fx="70%" fy="40%">
+      <stop offset="0%" stop-color="#ec4899" stop-opacity="0.2"/>
+      <stop offset="100%" stop-color="#ec4899" stop-opacity="0"/>
+    </radialGradient>
+
+    <radialGradient id="glow5" cx="25%" cy="75%" r="40%" fx="25%" fy="75%">
+      <stop offset="0%" stop-color="#8b5cf6" stop-opacity="0.25"/>
+      <stop offset="100%" stop-color="#8b5cf6" stop-opacity="0"/>
+    </radialGradient>
+
+    <!-- Center glow -->
+    <radialGradient id="centerGlow" cx="50%" cy="50%" r="50%" fx="50%" fy="50%">
+      <stop offset="0%" stop-color="#7c3aed" stop-opacity="0.08"/>
+      <stop offset="100%" stop-color="#7c3aed" stop-opacity="0"/>
+    </radialGradient>
+
+    <!-- Animated Styles -->
+    <style>
+      @keyframes float1 {
+        0%, 100% { transform: translate(0, 0) scale(1); opacity: 1; }
+        25% { transform: translate(30px, -40px) scale(1.08); opacity: 0.9; }
+        50% { transform: translate(-20px, 30px) scale(0.95); opacity: 1; }
+        75% { transform: translate(40px, 20px) scale(1.05); opacity: 0.85; }
+      }
+      @keyframes float2 {
+        0%, 100% { transform: translate(0, 0) scale(1); }
+        33% { transform: translate(-40px, 25px) scale(1.1); }
+        66% { transform: translate(25px, -35px) scale(0.92); }
+      }
+      @keyframes float3 {
+        0%, 100% { transform: translate(0, 0) scale(1); }
+        50% { transform: translate(20px, 40px) scale(1.15); }
+      }
+      @keyframes pulse-glow {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.7; }
+      }
+      .orb-1 { animation: float1 25s ease-in-out infinite; }
+      .orb-2 { animation: float2 30s ease-in-out infinite; }
+      .orb-3 { animation: float3 20s ease-in-out infinite; }
+      .orb-4 { animation: float2 28s ease-in-out infinite reverse; }
+      .orb-5 { animation: float1 35s ease-in-out infinite reverse; }
+      .center-pulse { animation: pulse-glow 8s ease-in-out infinite; }
+    </style>
+  </defs>
+
+  <!-- Deep Dark Base -->
+  <rect width="100%" height="100%" fill="#0d0d12"/>
+
+  <!-- Gradient Orbs -->
+  <g class="orb-1">
+    <ellipse cx="288" cy="270" rx="550" ry="400" fill="url(#glow1)"/>
+  </g>
+
+  <g class="orb-2">
+    <ellipse cx="1632" cy="162" rx="500" ry="400" fill="url(#glow2)"/>
+  </g>
+
+  <g class="orb-3">
+    <ellipse cx="960" cy="1026" rx="900" ry="450" fill="url(#glow3)"/>
+  </g>
+
+  <g class="orb-4">
+    <ellipse cx="1344" cy="432" rx="450" ry="350" fill="url(#glow4)"/>
+  </g>
+
+  <g class="orb-5">
+    <ellipse cx="480" cy="810" rx="500" ry="380" fill="url(#glow5)"/>
+  </g>
+
+  <!-- Center ambient glow -->
+  <g class="center-pulse">
+    <ellipse cx="960" cy="540" rx="700" ry="450" fill="url(#centerGlow)"/>
+  </g>
+
+  <!-- Subtle star-like points -->
+  <g fill="#ffffff" opacity="0.03">
+    <circle cx="200" cy="150" r="1"/>
+    <circle cx="450" cy="280" r="0.8"/>
+    <circle cx="800" cy="120" r="1.2"/>
+    <circle cx="1200" cy="200" r="0.9"/>
+    <circle cx="1500" cy="350" r="1"/>
+    <circle cx="1700" cy="180" r="0.7"/>
+    <circle cx="300" cy="600" r="1"/>
+    <circle cx="1600" cy="700" r="0.8"/>
+    <circle cx="1100" cy="850" r="1.1"/>
+  </g>
+</svg>
