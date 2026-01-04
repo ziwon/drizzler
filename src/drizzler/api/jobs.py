@@ -25,6 +25,8 @@ class JobStatus(BaseModel):
     progress: float = 0.0
     current_stage: str = ""  # "Downloading metadata", "Downloading video", "Generating summary", etc.
     video_progress: Optional[VideoProgress] = None  # Detailed video download progress
+    video_title: str = ""  # Video title from yt-dlp
+    video_thumbnail: str = ""  # Thumbnail URL from yt-dlp
     urls: List[str]
     created_at: datetime = Field(default_factory=datetime.now)
     completed_at: Optional[datetime] = None
@@ -70,13 +72,20 @@ class JobManager:
             """Callback for stage updates"""
             job.current_stage = stage
             if video_info:
-                job.video_progress = VideoProgress(
-                    downloaded_bytes=video_info.get("downloaded_bytes", 0),
-                    total_bytes=video_info.get("total_bytes", 0),
-                    speed=video_info.get("speed", ""),
-                    eta=video_info.get("eta", ""),
-                    percent=video_info.get("percent", 0.0)
-                )
+                # Handle video download progress
+                if "downloaded_bytes" in video_info:
+                    job.video_progress = VideoProgress(
+                        downloaded_bytes=video_info.get("downloaded_bytes", 0),
+                        total_bytes=video_info.get("total_bytes", 0),
+                        speed=video_info.get("speed", ""),
+                        eta=video_info.get("eta", ""),
+                        percent=video_info.get("percent", 0.0)
+                    )
+                # Handle video metadata (title, thumbnail)
+                if "title" in video_info:
+                    job.video_title = video_info.get("title", "")
+                if "thumbnail" in video_info:
+                    job.video_thumbnail = video_info.get("thumbnail", "")
             else:
                 job.video_progress = None
 

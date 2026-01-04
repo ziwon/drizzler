@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import Markdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import {
   Droplets,
   Trash2,
@@ -13,7 +15,6 @@ import {
   Sparkles,
   Download,
   Github,
-  Book,
   Play,
   Clock,
   CheckCircle2,
@@ -40,7 +41,7 @@ function App() {
     write_subs: true,
     write_txt: true,
     summarize: true,
-    summarize_mode: 'default',  // 'default' or 'lecture'
+    summary_lang: 'en',  // 'en', 'ko', 'ja'
     rate: 1.0,
     concurrency: 5,
     llm_model: ''
@@ -192,7 +193,7 @@ function App() {
               <span>GitHub</span>
             </a>
             <a href="#docs" className="btn-pill active">
-              <Book size={16} />
+              <FileText size={16} />
               <span>Docs</span>
             </a>
           </div>
@@ -250,23 +251,52 @@ function App() {
                   active={options.write_subs}
                   onClick={() => setOptions({ ...options, write_subs: !options.write_subs })}
                 />
-                <ToggleOption
-                  icon={<Sparkles size={18} />}
-                  label="AI Summary"
-                  active={options.summarize}
+
+                {/* AI Summary with Language Selection (spans 2 columns) */}
+                <div
+                  className={cn("summary-option", options.summarize && "active")}
                   onClick={() => setOptions({ ...options, summarize: !options.summarize })}
-                />
-                <ToggleOption
-                  icon={<Book size={18} />}
-                  label="Lecture Mode"
-                  active={options.summarize_mode === 'lecture'}
-                  onClick={() => setOptions({
-                    ...options,
-                    summarize_mode: options.summarize_mode === 'lecture' ? 'default' : 'lecture',
-                    summarize: true  // Auto-enable summarize when lecture mode is on
-                  })}
-                  hint="Detailed blog-style summary for lectures"
-                />
+                >
+                  <div className="summary-left">
+                    <span className="option-icon"><Sparkles size={18} /></span>
+                    <span className="option-label">AI Summary</span>
+                    <div className="toggle-switch" />
+                  </div>
+                  {options.summarize && (
+                    <div className="summary-langs" onClick={e => e.stopPropagation()}>
+                      <label className={cn("lang-pill", options.summary_lang === 'en' && "active")}>
+                        <input
+                          type="radio"
+                          name="summary_lang"
+                          value="en"
+                          checked={options.summary_lang === 'en'}
+                          onChange={() => setOptions({ ...options, summary_lang: 'en' })}
+                        />
+                        EN
+                      </label>
+                      <label className={cn("lang-pill", options.summary_lang === 'ko' && "active")}>
+                        <input
+                          type="radio"
+                          name="summary_lang"
+                          value="ko"
+                          checked={options.summary_lang === 'ko'}
+                          onChange={() => setOptions({ ...options, summary_lang: 'ko' })}
+                        />
+                        KO
+                      </label>
+                      <label className={cn("lang-pill", options.summary_lang === 'ja' && "active")}>
+                        <input
+                          type="radio"
+                          name="summary_lang"
+                          value="ja"
+                          checked={options.summary_lang === 'ja'}
+                          onChange={() => setOptions({ ...options, summary_lang: 'ja' })}
+                        />
+                        JP
+                      </label>
+                    </div>
+                  )}
+                </div>
               </div>
 
               {/* Submit Button */}
@@ -387,6 +417,8 @@ function JobCard({ job, onDelete, onPreview }) {
   // Get video progress info from API
   const videoProgress = job.video_progress;
   const currentStage = job.current_stage || '';
+  const videoTitle = job.video_title || '';
+  const videoThumbnail = job.video_thumbnail || '';
 
   // Format bytes to human readable
   const formatBytes = (bytes) => {
@@ -402,8 +434,33 @@ function JobCard({ job, onDelete, onPreview }) {
     return ['txt', 'md', 'json', 'vtt', 'srt'].includes(ext);
   };
 
+  // Truncate title for display
+  const truncateTitle = (title, maxLen = 50) => {
+    if (!title) return '';
+    return title.length > maxLen ? title.substring(0, maxLen) + '...' : title;
+  };
+
   return (
     <div className="job-card animate-fade-in">
+      {/* Video Info (thumbnail + title) */}
+      {(videoTitle || videoThumbnail) && (
+        <div className="job-video-info">
+          {videoThumbnail && (
+            <img
+              src={videoThumbnail}
+              alt=""
+              className="job-thumbnail"
+              loading="lazy"
+            />
+          )}
+          {videoTitle && (
+            <span className="job-title" title={videoTitle}>
+              {truncateTitle(videoTitle, 45)}
+            </span>
+          )}
+        </div>
+      )}
+
       <div className="job-header">
         <span className="job-url" title={job.urls[0]}>
           {displayUrl}...
@@ -544,16 +601,20 @@ function getFileLabel(filename) {
   const ext = filename.split('.').pop().toLowerCase();
   const name = filename.toLowerCase();
 
-  // Check if it's a summary file
+  // .md files are always AI Summary (they're generated by the summarizer)
+  if (ext === 'md') {
+    return 'AI Summary';
+  }
+
+  // Check if it's a summary txt file (rare case)
   if (name.includes('summary') || name.includes('_summary')) {
     return 'AI Summary';
   }
 
-  if (['mp4', 'mkv', 'webm'].includes(ext)) return 'Video (MP4)';
+  if (['mp4', 'mkv', 'webm', 'mov', 'avi'].includes(ext)) return 'Video';
   if (['json'].includes(ext)) return 'Metadata (JSON)';
   if (['txt'].includes(ext)) return 'Text Transcript';
-  if (['md'].includes(ext)) return 'AI Summary';
-  if (['jpg', 'png', 'webp'].includes(ext)) return 'Thumbnail';
+  if (['jpg', 'jpeg', 'png', 'webp', 'gif'].includes(ext)) return 'Thumbnail';
   if (['vtt', 'srt'].includes(ext)) return 'Subtitles';
   return filename;
 }
@@ -617,7 +678,15 @@ function sortFilesByPriority(files) {
 function FilePreviewModal({ isOpen, onClose, content, filename, downloadUrl, loading, fileType }) {
   if (!isOpen) return null;
 
-  // Format JSON content
+  // Remove YAML frontmatter from markdown content
+  const stripFrontmatter = (text) => {
+    if (!text) return text;
+    // Match YAML frontmatter: starts with ---, ends with ---
+    const frontmatterRegex = /^---\n[\s\S]*?\n---\n\n?/;
+    return text.replace(frontmatterRegex, '');
+  };
+
+  // Format content based on file type
   const formatContent = () => {
     if (fileType === 'json' && content) {
       try {
@@ -629,10 +698,14 @@ function FilePreviewModal({ isOpen, onClose, content, filename, downloadUrl, loa
     return content;
   };
 
+  // Check if file is AI Summary markdown
+  const isMarkdownSummary = filename.includes('.summary.md') ||
+    (filename.endsWith('.md') && filename.includes('summary'));
+
   // Get file type label
   const getTypeLabel = () => {
+    if (isMarkdownSummary) return 'AI Summary';
     const ext = filename.split('.').pop().toLowerCase();
-    if (filename.includes('summary')) return 'AI Summary';
     if (ext === 'md') return 'Markdown';
     if (ext === 'json') return 'JSON';
     if (ext === 'txt') return 'Text';
@@ -662,10 +735,15 @@ function FilePreviewModal({ isOpen, onClose, content, filename, downloadUrl, loa
               <Loader2 size={32} className="animate-spin text-purple-400" />
               <span>Loading content...</span>
             </div>
+          ) : isMarkdownSummary && content ? (
+            // Render markdown for AI Summary files (no frontmatter)
+            <div className="modal-markdown-rendered">
+              <Markdown remarkPlugins={[remarkGfm]}>{stripFrontmatter(content)}</Markdown>
+            </div>
           ) : (
+            // Raw text for other files
             <pre className={cn(
               "modal-text",
-              fileType === 'markdown' && "modal-markdown",
               fileType === 'json' && "modal-json"
             )}>
               {formatContent()}

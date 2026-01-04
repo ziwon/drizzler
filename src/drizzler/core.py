@@ -49,7 +49,7 @@ class RequestDrizzler:
         download_subs: bool = False,  # --write-subs
         download_txt: bool = False,  # --write-txt
         summarize: bool = False,  # --summarize
-        summarize_mode: str = "default",  # Summarization mode: default, lecture
+        summary_lang: str = "en",  # Summary language: en, ko, ja
         llm_provider: str = "openai",  # LLM provider (openai-compatible, ollama, transformers)
         llm_model: str = "",  # LLM model (empty = use LLM_MODEL env var)
         output_dir: str = "./downloads",  # -o
@@ -88,7 +88,7 @@ class RequestDrizzler:
         self.download_subs = download_subs
         self.download_txt = download_txt
         self.summarize = summarize
-        self.summarize_mode = summarize_mode
+        self.summary_lang = summary_lang
         self.llm_provider = llm_provider
         self.llm_model = llm_model
         self.output_dir = output_dir
@@ -216,34 +216,57 @@ class RequestDrizzler:
     # ────────────────────────────────
     # Summary Generation
     # ────────────────────────────────
-    def _generate_summary(self, video_id: str, lang_code: str, text: str, video_minutes: int = 10) -> None:
+    def _generate_summary(self, video_id: str, lang_code: str, text: str, video_minutes: int = 10, video_title: str = "") -> None:
         """Generate AI summary of the text content"""
+        import re as regex
+
+        def sanitize_filename(name: str, max_len: int = 50) -> str:
+            """Remove invalid characters and truncate filename"""
+            # Remove/replace invalid filename characters
+            name = regex.sub(r'[<>:"/\\|?*]', '', name)
+            name = regex.sub(r'\s+', '_', name)  # Replace spaces with underscores
+            name = name.strip('._')  # Remove leading/trailing dots and underscores
+            # Truncate and add ellipsis
+            if len(name) > max_len:
+                name = name[:max_len].rstrip('_') + '...'
+            return name
+
         try:
-            logger.info(f"Generating summary for {video_id}.{lang_code} (mode={self.summarize_mode}, ~{video_minutes} min)")
+            # Use the specified summary language for output
+            output_lang = self.summary_lang or lang_code
+            logger.info(f"Generating summary for {video_id} (output_lang={output_lang}, ~{video_minutes} min)")
 
             # Report stage
-            mode_label = "lecture" if self.summarize_mode == "lecture" else "AI"
-            self._report_stage(f"Generating {mode_label} summary...")
+            lang_labels = {"en": "English", "ko": "Korean", "ja": "Japanese"}
+            lang_label = lang_labels.get(output_lang, "AI")
+            self._report_stage(f"Generating {lang_label} summary...")
 
-            # Initialize summarizer with mode
+            # Initialize summarizer with language
             summarizer = TextSummarizer(
                 provider=self.llm_provider,
                 model=self.llm_model,
-                mode=self.summarize_mode
+                summary_lang=output_lang
             )
 
             # Generate summary with video duration context
-            summary = summarizer.summarize(text, lang=lang_code, video_minutes=video_minutes)
+            summary = summarizer.summarize(text, video_minutes=video_minutes)
 
             if summary:
-                # Save summary as markdown file
-                summary_file = f"{self.output_dir}/{video_id}.{lang_code}.summary.md"
+                # Create filename: prefer title, fallback to video_id
+                if video_title:
+                    base_name = sanitize_filename(video_title, 50)
+                else:
+                    base_name = video_id
+
+                summary_file = f"{self.output_dir}/{base_name}.{output_lang}.summary.md"
                 with open(summary_file, "w", encoding="utf-8") as f:
                     # Add metadata header
                     f.write("---\n")
                     f.write(f"video_id: {video_id}\n")
-                    f.write(f"language: {lang_code}\n")
-                    f.write(f"mode: {self.summarize_mode}\n")
+                    if video_title:
+                        f.write(f"title: {video_title}\n")
+                    f.write(f"source_language: {lang_code}\n")
+                    f.write(f"output_language: {output_lang}\n")
                     f.write(f"model: {self.llm_model or 'default'}\n")
                     f.write(f"provider: {self.llm_provider}\n")
                     f.write(f"video_minutes: {video_minutes}\n")
@@ -252,7 +275,7 @@ class RequestDrizzler:
 
                 logger.info(f"Summary saved to {summary_file}")
             else:
-                logger.warning(f"Failed to generate summary for {video_id}.{lang_code}")
+                logger.warning(f"Failed to generate summary for {video_id}")
 
         except Exception as e:
             logger.error(f"Error generating summary: {e}")
@@ -260,7 +283,7 @@ class RequestDrizzler:
     # ────────────────────────────────
     # Subtitle Processing
     # ────────────────────────────────
-    def _extract_text_from_subtitles(self, video_id: str, video_minutes: int = 10) -> None:
+    def _extract_text_from_subtitles(self, video_id: str, video_minutes: int = 10, video_title: str = "") -> None:
         """Extract text only from VTT/SRT files and save as .txt"""
         import os
         import re
@@ -343,7 +366,7 @@ class RequestDrizzler:
 
                     # Generate summary if requested
                     if self.summarize:
-                        self._generate_summary(video_id, lang_code, text_content, video_minutes)
+                        self._generate_summary(video_id, lang_code, text_content, video_minutes, video_title)
 
                     # If user only wants text, remove the original subtitle file
                     if self.download_txt and not self.download_subs:
@@ -447,6 +470,15 @@ class RequestDrizzler:
                     if info is None:
                         return False, None
 
+                    # Report video metadata (title, thumbnail)
+                    video_title = info.get("title", "")
+                    video_thumbnail = info.get("thumbnail", "")
+                    if video_title or video_thumbnail:
+                        drizzler._report_stage("Downloading video...", {
+                            "title": video_title,
+                            "thumbnail": video_thumbnail
+                        })
+
                     # Report subtitle download
                     if download_any_subs:
                         drizzler._report_stage("Downloading subtitles...")
@@ -458,11 +490,12 @@ class RequestDrizzler:
                     # If we need text extraction or summarization, process the subtitle files
                     if (drizzler.download_txt or drizzler.summarize) and info:
                         video_id = info.get("id")
+                        video_title = info.get("title", "")
                         video_duration = info.get("duration", 0)  # Duration in seconds
                         video_minutes = max(1, video_duration // 60) if video_duration else 10
                         if video_id:
                             drizzler._report_stage("Extracting text from subtitles...")
-                            drizzler._extract_text_from_subtitles(video_id, video_minutes)
+                            drizzler._extract_text_from_subtitles(video_id, video_minutes, video_title)
 
                     return True, info.get("url")  # actual CDN URL if downloaded
             except Exception as e:

@@ -53,10 +53,10 @@ def parse_args():
         help="Generate AI summary of caption text in markdown format",
     )
     parser.add_argument(
-        "--mode",
-        choices=["default", "lecture"],
-        default="default",
-        help="Summarization mode: 'default' for simple summaries, 'lecture' for structured blog-style summaries",
+        "--summary-lang",
+        choices=["en", "ko", "ja"],
+        default="en",
+        help="Summary output language: 'en' (English), 'ko' (Korean), 'ja' (Japanese)",
     )
     parser.add_argument(
         "--llm-provider",
@@ -179,7 +179,7 @@ async def run():
         download_subs=download_subs,
         download_txt=download_txt,
         summarize=summarize,
-        summarize_mode=args.mode,
+        summary_lang=args.summary_lang,
         llm_provider=args.llm_provider,
         llm_model=args.llm_model,
         output_dir=args.output_dir,

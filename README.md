@@ -32,7 +32,7 @@ docker run --rm ghcr.io/ziwon/drizzler:latest \
 - **YouTube Optimized**: Automatic CDN host grouping and automated playlist expansion.
 - **Proxy Support**: Full support for HTTP/HTTPS proxies across all fetch and download modes.
 - **Observability**: Real-time terminal progress bars, ASCII latency histograms, and worker timelines.
-- **AI Integration**: Seamless subtitle extraction and AI summarization via Ollama/Transformers.
+- **AI Integration**: Seamless subtitle extraction and AI summarization via Ollama, Gemini, or local models.
 
 ---
 
@@ -54,11 +54,17 @@ docker run --rm -v "$(pwd)/downloads:/app/downloads" ghcr.io/ziwon/drizzler:late
 
 ### 3. Subtitles & AI Summarization
 ```bash
-# Extract text and save to host
-docker run --rm -v "$(pwd)/downloads:/app/downloads" ghcr.io/ziwon/drizzler:latest \
+# Extract text and save to host (Local Ollama or Gemini)
+docker run --rm -v "$(pwd)/downloads:/app/downloads" \
+  -e GOOGLE_API_KEY="your_api_key" \
+  ghcr.io/ziwon/drizzler:latest \
   "https://www.youtube.com/watch?v=JvvQTFqWv-U" \
-  --summarize --llm-model qwen2.5:3b -o ./downloads
+  --summarize --summary-lang ko --llm-model gemini-3-flash-preview -o ./downloads
 ```
+
+<p align="center">
+  <img src="docs/screencapture-summary.png" alt="AI Summary Preview" width="800" />
+</p>
 
 ### 4. Playlist Processing
 ```bash

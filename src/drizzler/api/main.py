@@ -28,7 +28,7 @@ class JobCreate(BaseModel):
     write_subs: bool = False
     write_txt: bool = False
     summarize: bool = False
-    summarize_mode: str = "default"  # default or lecture
+    summary_lang: str = "en"  # en, ko, ja
     rate: float = 1.0
     concurrency: int = 5
     llm_provider: str = "openai"
@@ -43,7 +43,7 @@ async def create_job(request: JobCreate):
         "download_subs": request.write_subs,
         "download_txt": request.write_txt,
         "summarize": request.summarize,
-        "summarize_mode": request.summarize_mode,
+        "summary_lang": request.summary_lang,
         "per_host_rate": request.rate,
         "global_concurrency": request.concurrency,
         "llm_provider": request.llm_provider,
