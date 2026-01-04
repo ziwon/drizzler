@@ -28,9 +28,11 @@ class JobCreate(BaseModel):
     write_subs: bool = False
     write_txt: bool = False
     summarize: bool = False
+    summarize_mode: str = "default"  # default or lecture
     rate: float = 1.0
     concurrency: int = 5
-    llm_model: str = "qwen2.5:3b"
+    llm_provider: str = "openai"
+    llm_model: str = ""
 
 @app.post("/api/jobs", response_model=dict)
 async def create_job(request: JobCreate):
@@ -41,8 +43,10 @@ async def create_job(request: JobCreate):
         "download_subs": request.write_subs,
         "download_txt": request.write_txt,
         "summarize": request.summarize,
+        "summarize_mode": request.summarize_mode,
         "per_host_rate": request.rate,
         "global_concurrency": request.concurrency,
+        "llm_provider": request.llm_provider,
         "llm_model": request.llm_model,
         "use_progress_bar": False, # Disable rich progress bar in API
     }

@@ -53,15 +53,21 @@ def parse_args():
         help="Generate AI summary of caption text in markdown format",
     )
     parser.add_argument(
+        "--mode",
+        choices=["default", "lecture"],
+        default="default",
+        help="Summarization mode: 'default' for simple summaries, 'lecture' for structured blog-style summaries",
+    )
+    parser.add_argument(
         "--llm-provider",
-        choices=["ollama", "transformers"],
-        default="ollama",
-        help="LLM provider for summarization (default: ollama)",
+        choices=["openai", "ollama", "transformers"],
+        default="openai",
+        help="LLM provider: 'openai' for OpenAI-compatible APIs (llama.cpp, vLLM), 'ollama', or 'transformers'",
     )
     parser.add_argument(
         "--llm-model",
-        default="qwen2.5:3b",
-        help="Model to use for summarization (default: qwen2.5:3b for Ollama)",
+        default="",
+        help="Model to use for summarization (empty = use LLM_MODEL env var)",
     )
     parser.add_argument(
         "--simulate",
@@ -173,6 +179,8 @@ async def run():
         download_subs=download_subs,
         download_txt=download_txt,
         summarize=summarize,
+        summarize_mode=args.mode,
+        llm_provider=args.llm_provider,
         llm_model=args.llm_model,
         output_dir=args.output_dir,
         simulate=args.simulate,

@@ -11,10 +11,20 @@ from drizzler.core import RequestDrizzler
 
 logger = logging.getLogger(__name__)
 
+class VideoProgress(BaseModel):
+    """Video download progress details"""
+    downloaded_bytes: float = 0
+    total_bytes: float = 0
+    speed: str = ""  # e.g., "12.5 MB/s"
+    eta: str = ""    # e.g., "00:28"
+    percent: float = 0.0
+
 class JobStatus(BaseModel):
     id: str
     status: str  # "pending", "running", "completed", "failed"
     progress: float = 0.0
+    current_stage: str = ""  # "Downloading metadata", "Downloading video", "Generating summary", etc.
+    video_progress: Optional[VideoProgress] = None  # Detailed video download progress
     urls: List[str]
     created_at: datetime = Field(default_factory=datetime.now)
     completed_at: Optional[datetime] = None
@@ -39,7 +49,8 @@ class JobManager:
             id=job_id,
             status="pending",
             urls=urls,
-            output_dir=job_dir
+            output_dir=job_dir,
+            current_stage="Initializing..."
         )
         self.jobs[job_id] = job
 
@@ -50,15 +61,31 @@ class JobManager:
     async def _run_job(self, job_id: str, options: Dict[str, Any]):
         job = self.jobs[job_id]
         job.status = "running"
+        job.current_stage = "Starting..."
 
         def progress_callback(completed, total, worker_id):
-            job.progress = (completed / total) * 100
+            job.progress = (completed / total) * 100 if total > 0 else 0
+
+        def stage_callback(stage: str, video_info: Optional[Dict] = None):
+            """Callback for stage updates"""
+            job.current_stage = stage
+            if video_info:
+                job.video_progress = VideoProgress(
+                    downloaded_bytes=video_info.get("downloaded_bytes", 0),
+                    total_bytes=video_info.get("total_bytes", 0),
+                    speed=video_info.get("speed", ""),
+                    eta=video_info.get("eta", ""),
+                    percent=video_info.get("percent", 0.0)
+                )
+            else:
+                job.video_progress = None
 
         try:
             drizzler = RequestDrizzler(
                 urls=job.urls,
                 output_dir=job.output_dir,
                 progress_callback=progress_callback,
+                stage_callback=stage_callback,
                 **options
             )
             await drizzler.run()
@@ -73,12 +100,16 @@ class JobManager:
             job.files = files
             job.status = "completed"
             job.progress = 100.0
+            job.current_stage = "Completed"
+            job.video_progress = None
             job.completed_at = datetime.now()
 
         except Exception as e:
             logger.error(f"Job {job_id} failed: {e}")
             job.status = "failed"
             job.error = str(e)
+            job.current_stage = "Failed"
+            job.video_progress = None
 
     def get_job(self, job_id: str) -> Optional[JobStatus]:
         return self.jobs.get(job_id)

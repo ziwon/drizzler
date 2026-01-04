@@ -19,7 +19,8 @@ import {
   CheckCircle2,
   XCircle,
   Subtitles,
-  Code
+  X,
+  Eye
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -39,12 +40,23 @@ function App() {
     write_subs: true,
     write_txt: true,
     summarize: true,
+    summarize_mode: 'default',  // 'default' or 'lecture'
     rate: 1.0,
     concurrency: 5,
-    llm_model: 'qwen2.5:3b'
+    llm_model: ''
   });
   const [jobs, setJobs] = useState([]);
   const [submitting, setSubmitting] = useState(false);
+
+  // Modal state for file preview
+  const [previewModal, setPreviewModal] = useState({
+    isOpen: false,
+    content: '',
+    filename: '',
+    downloadUrl: '',
+    loading: false,
+    fileType: 'text' // 'text', 'markdown', 'json'
+  });
 
   const fetchJobs = async () => {
     try {
@@ -96,6 +108,52 @@ function App() {
     } catch (error) {
       console.error('Failed to delete job:', error);
     }
+  };
+
+  const previewFile = async (jobId, filename) => {
+    const ext = filename.split('.').pop().toLowerCase();
+    const isPreviewable = ['txt', 'md', 'json', 'vtt', 'srt'].includes(ext);
+
+    if (!isPreviewable) return null; // Don't preview non-text files
+
+    const downloadUrl = `${API_BASE}/api/jobs/${jobId}/files/${filename}`;
+
+    setPreviewModal({
+      isOpen: true,
+      content: '',
+      filename,
+      downloadUrl,
+      loading: true,
+      fileType: ext === 'md' ? 'markdown' : ext === 'json' ? 'json' : 'text'
+    });
+
+    try {
+      const response = await fetch(downloadUrl);
+      const text = await response.text();
+      setPreviewModal(prev => ({
+        ...prev,
+        content: text,
+        loading: false
+      }));
+    } catch (error) {
+      console.error('Failed to fetch file:', error);
+      setPreviewModal(prev => ({
+        ...prev,
+        content: 'Failed to load file content.',
+        loading: false
+      }));
+    }
+  };
+
+  const closePreview = () => {
+    setPreviewModal({
+      isOpen: false,
+      content: '',
+      filename: '',
+      downloadUrl: '',
+      loading: false,
+      fileType: 'text'
+    });
   };
 
   const currentTime = new Date().toLocaleString('en-US', {
@@ -199,11 +257,15 @@ function App() {
                   onClick={() => setOptions({ ...options, summarize: !options.summarize })}
                 />
                 <ToggleOption
-                  icon={<Code size={18} />}
-                  label="Custom Script"
-                  active={false}
-                  onClick={() => { }}
-                  disabled
+                  icon={<Book size={18} />}
+                  label="Lecture Mode"
+                  active={options.summarize_mode === 'lecture'}
+                  onClick={() => setOptions({
+                    ...options,
+                    summarize_mode: options.summarize_mode === 'lecture' ? 'default' : 'lecture',
+                    summarize: true  // Auto-enable summarize when lecture mode is on
+                  })}
+                  hint="Detailed blog-style summary for lectures"
                 />
               </div>
 
@@ -247,6 +309,7 @@ function App() {
                     key={job.id}
                     job={job}
                     onDelete={() => deleteJob(job.id)}
+                    onPreview={(filename) => previewFile(job.id, filename)}
                   />
                 ))
               )}
@@ -259,6 +322,17 @@ function App() {
           <span className="footer-time">{currentTime}</span>
         </div>
       </div>
+
+      {/* File Preview Modal */}
+      <FilePreviewModal
+        isOpen={previewModal.isOpen}
+        onClose={closePreview}
+        content={previewModal.content}
+        filename={previewModal.filename}
+        downloadUrl={previewModal.downloadUrl}
+        loading={previewModal.loading}
+        fileType={previewModal.fileType}
+      />
     </div>
   );
 }
@@ -267,7 +341,7 @@ function App() {
    COMPONENTS
    ═══════════════════════════════════════════════════════════════════════════ */
 
-function ToggleOption({ icon, label, active, onClick, disabled }) {
+function ToggleOption({ icon, label, active, onClick, disabled, hint }) {
   return (
     <div
       onClick={disabled ? undefined : onClick}
@@ -276,6 +350,7 @@ function ToggleOption({ icon, label, active, onClick, disabled }) {
         active && "active",
         disabled && "opacity-40 cursor-not-allowed"
       )}
+      title={hint}
     >
       <div className="option-info">
         <span className="option-icon">{icon}</span>
@@ -286,7 +361,7 @@ function ToggleOption({ icon, label, active, onClick, disabled }) {
   );
 }
 
-function JobCard({ job, onDelete }) {
+function JobCard({ job, onDelete, onPreview }) {
   const statusConfig = {
     pending: {
       badge: 'badge-queued',
@@ -309,10 +384,23 @@ function JobCard({ job, onDelete }) {
   const config = statusConfig[job.status] || statusConfig.pending;
   const displayUrl = job.urls[0]?.replace(/^https?:\/\//, '').slice(0, 30);
 
-  // Mock stats for display (in real app, these would come from API)
-  const estimatedTime = job.status === 'running' ? '2m 30s' : '--';
-  const speed = job.status === 'running' ? '12.5 MB/s' : '--';
-  const quality = '1080p';
+  // Get video progress info from API
+  const videoProgress = job.video_progress;
+  const currentStage = job.current_stage || '';
+
+  // Format bytes to human readable
+  const formatBytes = (bytes) => {
+    if (!bytes) return '';
+    if (bytes > 1024 * 1024 * 1024) return `${(bytes / 1024 / 1024 / 1024).toFixed(1)} GB`;
+    if (bytes > 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(0)} MB`;
+    return `${(bytes / 1024).toFixed(0)} KB`;
+  };
+
+  // Check if file is previewable
+  const isPreviewable = (filename) => {
+    const ext = filename.split('.').pop().toLowerCase();
+    return ['txt', 'md', 'json', 'vtt', 'srt'].includes(ext);
+  };
 
   return (
     <div className="job-card animate-fade-in">
@@ -325,6 +413,14 @@ function JobCard({ job, onDelete }) {
         </span>
       </div>
 
+      {/* Current Stage */}
+      {job.status === 'running' && currentStage && (
+        <div className="current-stage">
+          <Loader2 size={12} className="animate-spin" />
+          <span>{currentStage}</span>
+        </div>
+      )}
+
       {/* Progress */}
       <div className="progress-container">
         <div className="progress-bar">
@@ -334,54 +430,81 @@ function JobCard({ job, onDelete }) {
               job.status === 'completed' && "completed",
               job.status === 'failed' && "failed"
             )}
-            style={{ width: `${job.progress}%` }}
+            style={{ width: `${videoProgress?.percent || job.progress}%` }}
           />
         </div>
-        <div className="progress-text">{Math.round(job.progress)}%</div>
+        <div className="progress-text">
+          {Math.round(videoProgress?.percent || job.progress)}%
+        </div>
       </div>
 
-      {/* Stats */}
-      {job.status === 'running' && (
-        <div className="job-stats">
-          <div className="job-stat">
-            <div className="label">Estimated Time</div>
-            <div className="value">{estimatedTime}</div>
-          </div>
-          <div className="job-stat">
-            <div className="label">Speed</div>
-            <div className="value">{speed}</div>
-          </div>
-          <div className="job-stat">
-            <div className="label">Quality</div>
-            <div className="value">{quality}</div>
-          </div>
+      {/* Video Download Stats - only shown when downloading video */}
+      {job.status === 'running' && videoProgress && videoProgress.total_bytes > 0 && (
+        <div className="video-stats">
+          <span className="video-stat">
+            {formatBytes(videoProgress.downloaded_bytes)} / {formatBytes(videoProgress.total_bytes)}
+          </span>
+          {videoProgress.speed && (
+            <span className="video-stat">• {videoProgress.speed}</span>
+          )}
+          {videoProgress.eta && (
+            <span className="video-stat">• ETA {videoProgress.eta}</span>
+          )}
         </div>
       )}
 
       {/* Files */}
-      {job.files && job.files.length > 0 && job.status === 'completed' && (
-        <div className="files-dropdown">
-          <div className="flex items-center gap-2 text-xs text-white/40 mb-2">
-            <Download size={14} />
-            <span>Download Files</span>
-          </div>
-          {job.files.slice(0, 3).map((file, idx) => (
-            <a
-              key={idx}
-              href={`${API_BASE}/api/jobs/${job.id}/files/${file}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="file-link"
-            >
-              <div className="file-name">
-                <FileIcon filename={file} />
-                <span>{getFileLabel(file)}</span>
+      {job.files && job.files.length > 0 && job.status === 'completed' && (() => {
+        const cleanFiles = sortFilesByPriority(job.files);
+        if (cleanFiles.length === 0) return null;
+        return (
+          <div className="files-dropdown">
+            <div className="flex items-center gap-2 text-xs text-white/40 mb-2">
+              <Download size={14} />
+              <span>Download Files ({cleanFiles.length})</span>
+            </div>
+            {cleanFiles.map((file, idx) => (
+              <div key={idx} className="file-item">
+                {isPreviewable(file) ? (
+                  <>
+                    <button
+                      onClick={() => onPreview(file)}
+                      className="file-link file-preview-btn"
+                    >
+                      <div className="file-name">
+                        <FileIcon filename={file} />
+                        <span>{getFileLabel(file)}</span>
+                      </div>
+                      <Eye size={12} className="opacity-40" />
+                    </button>
+                    <a
+                      href={`${API_BASE}/api/jobs/${job.id}/files/${file}`}
+                      download
+                      className="file-download-btn"
+                      title="Download"
+                    >
+                      <Download size={12} />
+                    </a>
+                  </>
+                ) : (
+                  <a
+                    href={`${API_BASE}/api/jobs/${job.id}/files/${file}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="file-link"
+                  >
+                    <div className="file-name">
+                      <FileIcon filename={file} />
+                      <span>{getFileLabel(file)}</span>
+                    </div>
+                    <ExternalLink size={12} className="opacity-40" />
+                  </a>
+                )}
               </div>
-              <ExternalLink size={12} className="opacity-40" />
-            </a>
-          ))}
-        </div>
-      )}
+            ))}
+          </div>
+        );
+      })()}
 
       {/* Delete button for non-running jobs */}
       {job.status !== 'running' && (
@@ -408,16 +531,165 @@ function FileIcon({ filename }) {
   if (['json'].includes(ext)) {
     return <Layers size={14} className="text-amber-400" />;
   }
+  if (['txt', 'md'].includes(ext)) {
+    return <Sparkles size={14} className="text-pink-400" />;
+  }
+  if (['vtt', 'srt'].includes(ext)) {
+    return <Subtitles size={14} className="text-green-400" />;
+  }
   return <FileText size={14} className="text-white/40" />;
 }
 
 function getFileLabel(filename) {
   const ext = filename.split('.').pop().toLowerCase();
+  const name = filename.toLowerCase();
+
+  // Check if it's a summary file
+  if (name.includes('summary') || name.includes('_summary')) {
+    return 'AI Summary';
+  }
+
   if (['mp4', 'mkv', 'webm'].includes(ext)) return 'Video (MP4)';
   if (['json'].includes(ext)) return 'Metadata (JSON)';
-  if (['txt'].includes(ext)) return 'Summary (TXT)';
+  if (['txt'].includes(ext)) return 'Text Transcript';
+  if (['md'].includes(ext)) return 'AI Summary';
   if (['jpg', 'png', 'webp'].includes(ext)) return 'Thumbnail';
+  if (['vtt', 'srt'].includes(ext)) return 'Subtitles';
   return filename;
+}
+
+// Filter out temporary/incomplete download files
+function filterTempFiles(files) {
+  const tempExtensions = ['part', 'ytdl', 'temp', 'tmp', 'downloading'];
+  const tempPatterns = ['.part-Frag', '.part.', '-Frag'];
+
+  return files.filter(file => {
+    const lower = file.toLowerCase();
+
+    // Check for temp extensions
+    const ext = lower.split('.').pop();
+    if (tempExtensions.includes(ext)) return false;
+
+    // Check for temp patterns in filename
+    for (const pattern of tempPatterns) {
+      if (lower.includes(pattern.toLowerCase())) return false;
+    }
+
+    return true;
+  });
+}
+
+// Sort files to show summary first, then by type
+function sortFilesByPriority(files) {
+  // First filter out temp files
+  const cleanFiles = filterTempFiles(files);
+
+  const priority = {
+    'md': 1,      // Summary first
+    'txt': 2,     // Text transcript
+    'json': 3,    // Metadata
+    'mp4': 4,     // Video
+    'webm': 4,
+    'mkv': 4,
+    'mov': 4,
+    'avi': 4,
+    'jpg': 5,     // Thumbnail
+    'png': 5,
+    'webp': 5,
+    'jpeg': 5,
+    'vtt': 6,     // Subtitles
+    'srt': 6,
+  };
+
+  return cleanFiles.sort((a, b) => {
+    const extA = a.split('.').pop().toLowerCase();
+    const extB = b.split('.').pop().toLowerCase();
+    const prioA = priority[extA] || 10;
+    const prioB = priority[extB] || 10;
+    return prioA - prioB;
+  });
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   FILE PREVIEW MODAL
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+function FilePreviewModal({ isOpen, onClose, content, filename, downloadUrl, loading, fileType }) {
+  if (!isOpen) return null;
+
+  // Format JSON content
+  const formatContent = () => {
+    if (fileType === 'json' && content) {
+      try {
+        return JSON.stringify(JSON.parse(content), null, 2);
+      } catch {
+        return content;
+      }
+    }
+    return content;
+  };
+
+  // Get file type label
+  const getTypeLabel = () => {
+    const ext = filename.split('.').pop().toLowerCase();
+    if (filename.includes('summary')) return 'AI Summary';
+    if (ext === 'md') return 'Markdown';
+    if (ext === 'json') return 'JSON';
+    if (ext === 'txt') return 'Text';
+    if (ext === 'vtt' || ext === 'srt') return 'Subtitles';
+    return ext.toUpperCase();
+  };
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-container" onClick={e => e.stopPropagation()}>
+        {/* Header */}
+        <div className="modal-header">
+          <div className="modal-title">
+            <FileText size={18} className="text-purple-400" />
+            <span className="modal-filename">{filename}</span>
+            <span className="modal-type-badge">{getTypeLabel()}</span>
+          </div>
+          <button onClick={onClose} className="modal-close">
+            <X size={20} />
+          </button>
+        </div>
+
+        {/* Content */}
+        <div className="modal-content">
+          {loading ? (
+            <div className="modal-loading">
+              <Loader2 size={32} className="animate-spin text-purple-400" />
+              <span>Loading content...</span>
+            </div>
+          ) : (
+            <pre className={cn(
+              "modal-text",
+              fileType === 'markdown' && "modal-markdown",
+              fileType === 'json' && "modal-json"
+            )}>
+              {formatContent()}
+            </pre>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="modal-footer">
+          <a
+            href={downloadUrl}
+            download
+            className="modal-download-btn"
+          >
+            <Download size={16} />
+            <span>Download File</span>
+          </a>
+          <button onClick={onClose} className="modal-close-btn">
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 export default App;

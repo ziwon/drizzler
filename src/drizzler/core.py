@@ -49,13 +49,15 @@ class RequestDrizzler:
         download_subs: bool = False,  # --write-subs
         download_txt: bool = False,  # --write-txt
         summarize: bool = False,  # --summarize
-        llm_provider: str = "ollama",  # LLM provider
-        llm_model: str = "qwen2.5:3b",  # LLM model
+        summarize_mode: str = "default",  # Summarization mode: default, lecture
+        llm_provider: str = "openai",  # LLM provider (openai-compatible, ollama, transformers)
+        llm_model: str = "",  # LLM model (empty = use LLM_MODEL env var)
         output_dir: str = "./downloads",  # -o
         simulate: bool = False,
         use_progress_bar: bool = True,
         proxy: str | None = None,
         progress_callback: Callable[[int, int, int], None] | None = None,
+        stage_callback: Callable[[str, dict | None], None] | None = None,
     ) -> None:
         self.urls = [u.strip() for u in urls]
         if deduplicate:
@@ -86,6 +88,7 @@ class RequestDrizzler:
         self.download_subs = download_subs
         self.download_txt = download_txt
         self.summarize = summarize
+        self.summarize_mode = summarize_mode
         self.llm_provider = llm_provider
         self.llm_model = llm_model
         self.output_dir = output_dir
@@ -93,6 +96,7 @@ class RequestDrizzler:
         self.use_progress_bar = use_progress_bar and RICH_AVAILABLE
         self.proxy = proxy
         self.progress_callback = progress_callback
+        self.stage_callback = stage_callback
 
         import os
 
@@ -201,20 +205,35 @@ class RequestDrizzler:
             return None, None, {}
 
     # ────────────────────────────────
+    # Stage Reporting
+    # ────────────────────────────────
+    def _report_stage(self, stage: str, video_info: dict | None = None) -> None:
+        """Report current processing stage to callback"""
+        if self.stage_callback:
+            self.stage_callback(stage, video_info)
+        logger.debug(f"Stage: {stage}")
+
+    # ────────────────────────────────
     # Summary Generation
     # ────────────────────────────────
-    def _generate_summary(self, video_id: str, lang_code: str, text: str) -> None:
+    def _generate_summary(self, video_id: str, lang_code: str, text: str, video_minutes: int = 10) -> None:
         """Generate AI summary of the text content"""
         try:
-            logger.info(f"Generating summary for {video_id}.{lang_code}")
+            logger.info(f"Generating summary for {video_id}.{lang_code} (mode={self.summarize_mode}, ~{video_minutes} min)")
 
-            # Initialize summarizer
+            # Report stage
+            mode_label = "lecture" if self.summarize_mode == "lecture" else "AI"
+            self._report_stage(f"Generating {mode_label} summary...")
+
+            # Initialize summarizer with mode
             summarizer = TextSummarizer(
-                provider=self.llm_provider, model=self.llm_model
+                provider=self.llm_provider,
+                model=self.llm_model,
+                mode=self.summarize_mode
             )
 
-            # Generate summary
-            summary = summarizer.summarize(text, lang=lang_code)
+            # Generate summary with video duration context
+            summary = summarizer.summarize(text, lang=lang_code, video_minutes=video_minutes)
 
             if summary:
                 # Save summary as markdown file
@@ -224,8 +243,10 @@ class RequestDrizzler:
                     f.write("---\n")
                     f.write(f"video_id: {video_id}\n")
                     f.write(f"language: {lang_code}\n")
-                    f.write(f"model: {self.llm_model}\n")
+                    f.write(f"mode: {self.summarize_mode}\n")
+                    f.write(f"model: {self.llm_model or 'default'}\n")
                     f.write(f"provider: {self.llm_provider}\n")
+                    f.write(f"video_minutes: {video_minutes}\n")
                     f.write("---\n\n")
                     f.write(summary)
 
@@ -239,7 +260,7 @@ class RequestDrizzler:
     # ────────────────────────────────
     # Subtitle Processing
     # ────────────────────────────────
-    def _extract_text_from_subtitles(self, video_id: str) -> None:
+    def _extract_text_from_subtitles(self, video_id: str, video_minutes: int = 10) -> None:
         """Extract text only from VTT/SRT files and save as .txt"""
         import os
         import re
@@ -322,7 +343,7 @@ class RequestDrizzler:
 
                     # Generate summary if requested
                     if self.summarize:
-                        self._generate_summary(video_id, lang_code, text_content)
+                        self._generate_summary(video_id, lang_code, text_content, video_minutes)
 
                     # If user only wants text, remove the original subtitle file
                     if self.download_txt and not self.download_subs:
@@ -342,19 +363,64 @@ class RequestDrizzler:
         start = now()
         loop = asyncio.get_event_loop()
 
+        # Store reference to self for use in nested function
+        drizzler = self
+
         def _run_ytdlp():
             import yt_dlp
 
+            # Progress hook for video download
+            def progress_hook(d):
+                try:
+                    if d['status'] == 'downloading':
+                        # Format speed
+                        speed = d.get('speed', 0) or 0
+                        if speed:
+                            if speed > 1024 * 1024:
+                                speed_str = f"{speed / 1024 / 1024:.1f} MB/s"
+                            else:
+                                speed_str = f"{speed / 1024:.1f} KB/s"
+                        else:
+                            speed_str = ""
+
+                        # Format ETA
+                        eta = d.get('eta', 0) or 0
+                        if eta:
+                            eta_min, eta_sec = divmod(int(eta), 60)
+                            eta_str = f"{eta_min:02d}:{eta_sec:02d}"
+                        else:
+                            eta_str = ""
+
+                        # Get progress info
+                        downloaded = d.get('downloaded_bytes', 0) or 0
+                        total = d.get('total_bytes') or d.get('total_bytes_estimate', 0) or 0
+                        percent = (downloaded / total * 100) if total > 0 else 0
+
+                        video_info = {
+                            "downloaded_bytes": float(downloaded),
+                            "total_bytes": float(total),
+                            "speed": speed_str,
+                            "eta": eta_str,
+                            "percent": percent
+                        }
+                        drizzler._report_stage("Downloading video...", video_info)
+
+                    elif d['status'] == 'finished':
+                        drizzler._report_stage("Processing video...", None)
+                except Exception as e:
+                    # Don't let progress reporting crash the download
+                    logger.debug(f"Progress hook error (ignored): {e}")
+
             # Enable subtitle download if either subs, txt, or summarize is requested
             download_any_subs = (
-                self.download_subs or self.download_txt or self.summarize
+                drizzler.download_subs or drizzler.download_txt or drizzler.summarize
             )
 
             ydl_opts = {
                 "quiet": True,
                 "no_warnings": True,
                 "noplaylist": True,
-                "outtmpl": f"{self.output_dir}/%(id)s.%(ext)s",
+                "outtmpl": f"{drizzler.output_dir}/%(id)s.%(ext)s",
                 "format": "best[ext=mp4]/best",  # prefer mp4
                 "writesubtitles": download_any_subs,
                 "writeautomaticsub": download_any_subs,  # Also get auto-generated subs
@@ -362,26 +428,41 @@ class RequestDrizzler:
                 if download_any_subs
                 else [],  # Download English and Korean
                 "subtitlesformat": "vtt/srt/best",  # Prefer VTT, then SRT
-                "writeinfojson": self.download_info,
-                "writethumbnail": self.download_thumbnail,
-                "skip_download": not self.download_video or self.simulate,
+                "writeinfojson": drizzler.download_info,
+                "writethumbnail": drizzler.download_thumbnail,
+                "skip_download": not drizzler.download_video or drizzler.simulate,
                 "ignoreerrors": True,  # Continue on download errors
                 "extractor_retries": 3,  # Retry on extraction errors
                 "fragment_retries": 3,  # Retry on fragment errors
-                "proxy": self.proxy,
+                "proxy": drizzler.proxy,
+                "progress_hooks": [progress_hook] if drizzler.download_video else [],
             }
 
             try:
+                # Report initial stage
+                drizzler._report_stage("Fetching video info...")
+
                 with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                    info = ydl.extract_info(url, download=not self.simulate)
+                    info = ydl.extract_info(url, download=not drizzler.simulate)
                     if info is None:
                         return False, None
 
+                    # Report subtitle download
+                    if download_any_subs:
+                        drizzler._report_stage("Downloading subtitles...")
+
+                    # Report thumbnail download
+                    if drizzler.download_thumbnail:
+                        drizzler._report_stage("Downloading thumbnail...")
+
                     # If we need text extraction or summarization, process the subtitle files
-                    if (self.download_txt or self.summarize) and info:
+                    if (drizzler.download_txt or drizzler.summarize) and info:
                         video_id = info.get("id")
+                        video_duration = info.get("duration", 0)  # Duration in seconds
+                        video_minutes = max(1, video_duration // 60) if video_duration else 10
                         if video_id:
-                            self._extract_text_from_subtitles(video_id)
+                            drizzler._report_stage("Extracting text from subtitles...")
+                            drizzler._extract_text_from_subtitles(video_id, video_minutes)
 
                     return True, info.get("url")  # actual CDN URL if downloaded
             except Exception as e:
