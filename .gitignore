@@ -10,7 +10,6 @@ wheels/
 .venv/
 .pyenv/
 .uv/
-uv.lock
 
 # dotenv
 .env
