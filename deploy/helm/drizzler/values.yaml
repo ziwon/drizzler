@@ -1,0 +1,92 @@
+# Default values for drizzler
+
+replicaCount: 1
+
+image:
+  repository: drizzler
+  pullPolicy: IfNotPresent
+  tag: ""
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  create: true
+  automount: true
+  annotations: {}
+  name: ""
+
+podAnnotations: {}
+podLabels: {}
+
+podSecurityContext: {}
+
+securityContext: {}
+
+service:
+  type: ClusterIP
+  port: 8000
+
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  hosts:
+    - host: drizzler.local
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+
+resources: {}
+
+livenessProbe:
+  httpGet:
+    path: /api/jobs
+    port: http
+  initialDelaySeconds: 10
+  periodSeconds: 30
+
+readinessProbe:
+  httpGet:
+    path: /api/jobs
+    port: http
+  initialDelaySeconds: 5
+  periodSeconds: 10
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 5
+  targetCPUUtilizationPercentage: 80
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
+
+# Application configuration
+config:
+  # HTTP request timeout in seconds
+  httpRequestTimeoutS: "10"
+  # LLM model to use for summarization
+  llmModel: "gemini-3-flash-preview"
+  # Optional: LLM host for Ollama or OpenAI-compatible servers
+  llmHost: ""
+  # Optional: Path to cookies file for yt-dlp
+  ytdlpCookiesPath: ""
+
+# Secrets - these should be overridden in production
+secrets:
+  # Google API key for Gemini summarization
+  googleApiKey: ""
+
+# Persistence for downloads
+persistence:
+  enabled: true
+  storageClass: ""
+  accessMode: ReadWriteOnce
+  size: 10Gi
+  existingClaim: ""

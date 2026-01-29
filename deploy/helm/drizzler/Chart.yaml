@@ -1,0 +1,15 @@
+apiVersion: v2
+name: drizzler
+description: Adaptive host-aware HTTP fetcher and YouTube downloader with AI summarization
+type: application
+version: 0.1.0
+appVersion: "0.2.0"
+keywords:
+  - youtube
+  - downloader
+  - throttling
+  - ai
+  - summarization
+maintainers:
+  - name: Aaron Yoon
+    email: yngpil.yoon@gmail.com

@@ -248,6 +248,7 @@ deploy-local:
     @echo "Building UI..."
     cd ui && npm install && npm run build
     @echo "Starting Drizzler Web SaaS..."
+    fuser -k 8000/tcp 2>/dev/null || true && sleep 1
     uv run uvicorn drizzler.api.main:app --host 0.0.0.0 --port 8000
 
 # Open Python REPL with project imports
@@ -322,6 +323,43 @@ backup:
     tar -czf downloads-backup-$(date +%Y%m%d-%H%M%S).tar.gz downloads/
     @echo "Backup created: downloads-backup-$(date +%Y%m%d-%H%M%S).tar.gz"
 
+
+# ============================================================================
+# Helm Chart Commands
+# ============================================================================
+
+helm_chart_path := "deploy/helm/drizzler"
+helm_registry := "oci://ghcr.io/ziwon"
+
+# Package Helm chart
+helm-package:
+    helm package {{helm_chart_path}} --destination {{helm_chart_path}}
+
+# Push Helm chart to OCI registry
+helm-push: helm-package
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if [ -n "${CR_PAT:-}" ]; then
+        echo "$CR_PAT" | helm registry login ghcr.io -u ziwon --password-stdin
+    fi
+    helm push {{helm_chart_path}}/drizzler-*.tgz {{helm_registry}}
+    echo "Pushed Helm chart to {{helm_registry}}/drizzler"
+
+# Show Helm chart info
+helm-show:
+    helm show all {{helm_chart_path}}
+
+# Lint Helm chart
+helm-lint:
+    helm lint {{helm_chart_path}}
+
+# Template Helm chart (dry-run)
+helm-template:
+    helm template drizzler {{helm_chart_path}}
+
+# Clean Helm chart packages
+helm-clean:
+    rm -f {{helm_chart_path}}/*.tgz
 
 # ============================================================================
 # Help & Documentation

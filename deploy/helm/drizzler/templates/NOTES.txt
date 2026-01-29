@@ -1,0 +1,35 @@
+Thank you for installing {{ .Chart.Name }}!
+
+Your release is named: {{ .Release.Name }}
+
+To access the Drizzler API:
+
+{{- if .Values.ingress.enabled }}
+  Visit: http{{ if $.Values.ingress.tls }}s{{ end }}://{{ (index .Values.ingress.hosts 0).host }}
+{{- else if contains "NodePort" .Values.service.type }}
+  export NODE_PORT=$(kubectl get --namespace {{ .Release.Namespace }} -o jsonpath="{.spec.ports[0].nodePort}" services {{ include "drizzler.fullname" . }})
+  export NODE_IP=$(kubectl get nodes --namespace {{ .Release.Namespace }} -o jsonpath="{.items[0].status.addresses[0].address}")
+  echo http://$NODE_IP:$NODE_PORT
+{{- else if contains "LoadBalancer" .Values.service.type }}
+  NOTE: It may take a few minutes for the LoadBalancer IP to be available.
+        You can watch the status by running:
+        kubectl get --namespace {{ .Release.Namespace }} svc -w {{ include "drizzler.fullname" . }}
+
+  export SERVICE_IP=$(kubectl get svc --namespace {{ .Release.Namespace }} {{ include "drizzler.fullname" . }} --template "{{"{{ range (index .status.loadBalancer.ingress 0) }}{{.}}{{ end }}"}}")
+  echo http://$SERVICE_IP:{{ .Values.service.port }}
+{{- else if contains "ClusterIP" .Values.service.type }}
+  kubectl --namespace {{ .Release.Namespace }} port-forward svc/{{ include "drizzler.fullname" . }} 8000:{{ .Values.service.port }}
+  Then visit: http://localhost:8000
+{{- end }}
+
+API Endpoints:
+  - GET  /api/jobs         - List all jobs
+  - POST /api/jobs         - Create a new job
+  - GET  /api/jobs/{id}    - Get job status
+  - DELETE /api/jobs/{id}  - Delete a job
+
+{{- if not .Values.secrets.googleApiKey }}
+
+WARNING: GOOGLE_API_KEY is not set. AI summarization will not work.
+         Set it using: --set secrets.googleApiKey=<your-key>
+{{- end }}
