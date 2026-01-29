@@ -1,0 +1,76 @@
+name: Release Helm Chart
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'deploy/helm/drizzler/**'
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+  CHART_PATH: deploy/helm/drizzler
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: 'latest'
+
+      - name: Login to GHCR OCI
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "$GITHUB_TOKEN" | helm registry login ${{ env.REGISTRY }} -u ${{ github.actor }} --password-stdin
+
+      - name: Get chart version
+        id: version
+        run: |
+          CHART_VERSION=$(grep '^version:' "${{ env.CHART_PATH }}/Chart.yaml" | awk '{print $2}')
+          APP_VERSION=$(grep '^appVersion:' "${{ env.CHART_PATH }}/Chart.yaml" | awk '{print $2}' | tr -d '"')
+          echo "chart_version=${CHART_VERSION}" >> $GITHUB_OUTPUT
+          echo "app_version=${APP_VERSION}" >> $GITHUB_OUTPUT
+
+      - name: Package Helm chart
+        run: |
+          helm package "${{ env.CHART_PATH }}" -d /tmp
+
+      - name: Push Helm chart to OCI registry
+        run: |
+          helm push "/tmp/drizzler-${{ steps.version.outputs.chart_version }}.tgz" oci://${{ env.REGISTRY }}/ziwon
+
+      - name: Update GitOps manifest
+        uses: restack/actions/actions/k8s-manifest-updater@v1
+        with:
+          app_id: ${{ secrets.APP_ID }}
+          private_key: ${{ secrets.APP_PRIVATE_KEY }}
+          installation_id: ${{ secrets.APP_INSTALLATION_ID }}
+          manifest_repo: 'ziwon/homelab'
+          manifest_path: 'platform/stacks/05-workloads/overlays/home/drizzler.yaml'
+          image: ${{ steps.version.outputs.chart_version }}
+          yaml_path: 'apps[name=drizzler].source.targetRevision'
+          branch: main
+          create_pr: false
+
+      - name: Chart summary
+        run: |
+          echo "### Drizzler Helm Chart Released :package:" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Chart:** \`drizzler\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Version:** \`${{ steps.version.outputs.chart_version }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**App Version:** \`${{ steps.version.outputs.app_version }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**OCI URL:** \`oci://${{ env.REGISTRY }}/ziwon/drizzler:${{ steps.version.outputs.chart_version }}\`" >> $GITHUB_STEP_SUMMARY

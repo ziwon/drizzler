@@ -43,8 +43,13 @@ spec:
           envFrom:
             - configMapRef:
                 name: {{ include "drizzler.fullname" . }}-config
+            {{- if .Values.existingSecret }}
+            - secretRef:
+                name: {{ .Values.existingSecret }}
+            {{- else if .Values.secrets.googleApiKey }}
             - secretRef:
                 name: {{ include "drizzler.fullname" . }}-secret
+            {{- end }}
           livenessProbe:
             {{- toYaml .Values.livenessProbe | nindent 12 }}
           readinessProbe:

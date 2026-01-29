@@ -78,7 +78,12 @@ config:
   # Optional: Path to cookies file for yt-dlp
   ytdlpCookiesPath: ""
 
+# Use existing secret instead of creating one
+# If set, secrets section below will be ignored
+existingSecret: ""
+
 # Secrets - these should be overridden in production
+# Ignored if existingSecret is set
 secrets:
   # Google API key for Gemini summarization
   googleApiKey: ""
