@@ -7,6 +7,7 @@ import os
 
 from drizzler.core import RequestDrizzler
 from drizzler.logging_config import setup_logging
+from drizzler.proxies import ProxyPool, load_proxy_list, validate_proxy_url
 
 
 def parse_args():
@@ -100,10 +101,16 @@ def parse_args():
         action="store_true",
         help="Disable terminal progress bar",
     )
-    parser.add_argument(
+    proxies = parser.add_mutually_exclusive_group()
+    proxies.add_argument(
         "--proxy",
         type=str,
         help="Proxy URL (e.g., http://user:pass@host:port)",
+    )
+    proxies.add_argument(
+        "--proxy-list",
+        metavar="PATH",
+        help="UTF-8 file of HTTP/HTTPS proxy URLs, rotated in round-robin order",
     )
 
     # Logging & Debugging
@@ -119,7 +126,18 @@ def parse_args():
         help="Optional file to write logs to (e.g., drizzler.log)",
     )
 
-    return parser.parse_args()
+    args = parser.parse_args()
+    try:
+        if args.proxy is not None:
+            validate_proxy_url(args.proxy)
+        args.proxy_pool = (
+            ProxyPool(load_proxy_list(args.proxy_list))
+            if args.proxy_list is not None
+            else None
+        )
+    except ValueError as exc:
+        parser.error(str(exc))
+    return args
 
 
 async def run():
@@ -186,6 +204,7 @@ async def run():
         simulate=args.simulate,
         use_progress_bar=not args.no_progress,
         proxy=args.proxy,
+        proxy_pool=args.proxy_pool,
     )
 
     logging.info(

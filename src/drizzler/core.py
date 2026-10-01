@@ -12,6 +12,7 @@ from .throttling import BoundedTokenBucket, HostCircuitBreaker
 from .metrics import compute_stats
 from .rendering import render_latency_histogram, render_timeline
 from .persistence import StateManager
+from .proxies import ProxyPool, ProxySafeLogger
 from .summarizer import TextSummarizer
 
 try:
@@ -58,7 +59,15 @@ class RequestDrizzler:
         proxy: str | None = None,
         progress_callback: Callable[[int, int, int], None] | None = None,
         stage_callback: Callable[[str, dict | None], None] | None = None,
+        proxy_pool: ProxyPool | None = None,
     ) -> None:
+        if proxy is not None and proxy_pool is not None:
+            raise ValueError("proxy and proxy_pool cannot be used together")
+        self.proxy_pool = (
+            proxy_pool
+            if proxy_pool is not None
+            else (ProxyPool([proxy]) if proxy is not None else None)
+        )
         self.urls = [u.strip() for u in urls]
         if deduplicate:
             seen = set()
@@ -180,13 +189,23 @@ class RequestDrizzler:
     # ────────────────────────────────
     # HTTP Fetch Logic
     # ────────────────────────────────
+    def _next_proxy(self) -> str | None:
+        return self.proxy_pool.next_proxy() if self.proxy_pool is not None else None
+
+    def _safe_proxy_message(self, message: object) -> str:
+        return (
+            self.proxy_pool.redact(message)
+            if self.proxy_pool is not None
+            else str(message)
+        )
+
     async def _fetch_once(
         self, session: aiohttp.ClientSession, url: str
     ) -> tuple[int | None, float | None, dict[str, str]]:
         start = now()
         headers = get_random_headers(self.default_headers)
         try:
-            async with session.get(url, headers=headers, proxy=self.proxy) as resp:
+            async with session.get(url, headers=headers, proxy=self._next_proxy()) as resp:
                 content = await resp.read()  # or just: await resp.text() for HTML
                 latency = now() - start
                 headers_dict = {k: v for k, v in resp.headers.items()}
@@ -195,13 +214,13 @@ class RequestDrizzler:
                 )
                 return resp.status, latency, headers_dict
         except aiohttp.ClientConnectorError as e:
-            logger.warning(f"Connection error for {url}: {e}")
+            logger.warning(self._safe_proxy_message(f"Connection error for {url}: {e}"))
             return None, None, {}
         except TimeoutError:
             logger.warning(f"Timeout for {url}")
             return None, None, {}
         except Exception as e:
-            logger.error(f"Unexpected error fetching {url}: {e}")
+            logger.error(self._safe_proxy_message(f"Unexpected error fetching {url}: {e}"))
             return None, None, {}
 
     # ────────────────────────────────
@@ -392,6 +411,9 @@ class RequestDrizzler:
         def _run_ytdlp():
             import yt_dlp
 
+            # Keep this proxy fixed for extraction, fragments and internal retries.
+            proxy = drizzler._next_proxy()
+
             # Progress hook for video download
             def progress_hook(d):
                 try:
@@ -432,7 +454,9 @@ class RequestDrizzler:
                         drizzler._report_stage("Processing video...", None)
                 except Exception as e:
                     # Don't let progress reporting crash the download
-                    logger.debug(f"Progress hook error (ignored): {e}")
+                    logger.debug(
+                        drizzler._safe_proxy_message(f"Progress hook error (ignored): {e}")
+                    )
 
             # Enable subtitle download if either subs, txt, or summarize is requested
             download_any_subs = (
@@ -457,9 +481,11 @@ class RequestDrizzler:
                 "ignoreerrors": True,  # Continue on download errors
                 "extractor_retries": 3,  # Retry on extraction errors
                 "fragment_retries": 3,  # Retry on fragment errors
-                "proxy": drizzler.proxy,
+                "proxy": proxy,
                 "progress_hooks": [progress_hook] if drizzler.download_video else [],
             }
+            if drizzler.proxy_pool is not None:
+                ydl_opts["logger"] = ProxySafeLogger(logger, drizzler.proxy_pool)
 
             try:
                 # Report initial stage
@@ -499,7 +525,11 @@ class RequestDrizzler:
 
                     return True, info.get("url")  # actual CDN URL if downloaded
             except Exception as e:
-                logger.error(f"[W{worker_id}] yt-dlp failed for {url}: {e}")
+                logger.error(
+                    drizzler._safe_proxy_message(
+                        f"[W{worker_id}] yt-dlp failed for {url}: {e}"
+                    )
+                )
                 return False, None
 
         try:
@@ -516,7 +546,11 @@ class RequestDrizzler:
                 return False, latency, "youtube-frontend"
         except Exception as e:
             latency = now() - start
-            logger.error(f"[W{worker_id}] Exception in yt-dlp executor: {e}")
+            logger.error(
+                self._safe_proxy_message(
+                    f"[W{worker_id}] Exception in yt-dlp executor: {e}"
+                )
+            )
             return False, latency, "youtube-frontend"
 
     async def _fetch_with_policy(
@@ -669,18 +703,20 @@ class RequestDrizzler:
             else:
                 playlist_urls.append(u)
 
-        ydl_opts = {
-            "quiet": True,
-            "no_warnings": True,
-            "extract_flat": True,
-            "force_generic_extractor": False,
-            "proxy": self.proxy,
-        }
-
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            for url in playlist_urls:
-                if "list=" in url or "playlist" in url:
-                    try:
+        for url in playlist_urls:
+            if "list=" in url or "playlist" in url:
+                try:
+                    # Each playlist extraction gets its own options and proxy.
+                    ydl_opts: dict = {
+                        "quiet": True,
+                        "no_warnings": True,
+                        "extract_flat": True,
+                        "force_generic_extractor": False,
+                        "proxy": self._next_proxy(),
+                    }
+                    if self.proxy_pool is not None:
+                        ydl_opts["logger"] = ProxySafeLogger(logger, self.proxy_pool)
+                    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                         logger.info(f"Expanding playlist: {url}")
                         info = ydl.extract_info(url, download=False)
                         if "entries" in info:
@@ -695,11 +731,13 @@ class RequestDrizzler:
                                         video_url = f"https://www.youtube.com/watch?v={video_id}"
                                 if video_url:
                                     expanded_urls.append(video_url)
-                    except Exception as e:
-                        logger.error(f"Failed to expand playlist {url}: {e}")
-                        expanded_urls.append(url)
-                else:
+                except Exception as e:
+                    logger.error(
+                        self._safe_proxy_message(f"Failed to expand playlist {url}: {e}")
+                    )
                     expanded_urls.append(url)
+            else:
+                expanded_urls.append(url)
 
         return expanded_urls
 

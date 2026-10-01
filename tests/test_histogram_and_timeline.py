@@ -1,4 +1,4 @@
-from drizzler.ascii_render import render_latency_histogram, render_timeline
+from drizzler.rendering import render_latency_histogram, render_timeline
 
 
 def test_histogram_empty():
