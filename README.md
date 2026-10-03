@@ -141,6 +141,11 @@ A failing proxy remains in the cycle. Proxy configuration here applies to HTTP
 fetches and yt-dlp, not AI provider calls. Web UI/API and Helm configuration have
 not been extended with proxy-list controls.
 
+For opt-in live acceptance checks (observed exit IPs, HTTP retry rotation,
+yt-dlp job pinning, and the Docker path), see
+[Live proxy benchmark](docs/live-proxy-benchmark.md). It requires externally
+supplied trial credentials; the default dry run makes no network requests.
+
 ---
 
 ## 🏗 Scaling to Millions
