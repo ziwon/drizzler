@@ -60,3 +60,12 @@ requirements*.txt
 .ruff_cache/
 .mypy_cache/
 drizzler_state.json
+
+# Never send proxy secrets or benchmark output to the Docker build context
+.env.*
+!.env.example
+proxies*.txt
+*proxy-list*.txt
+trial-proxies*
+benchmark-results/
+benchmarks/

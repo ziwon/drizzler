@@ -27,3 +27,11 @@ downloads/
 *.tmp
 *.info.json
 drizzler_state.json
+
+# Local proxy secrets and benchmark artifacts (keep actual files outside checkout)
+.env.*
+!.env.example
+proxies*.txt
+*proxy-list*.txt
+trial-proxies*
+benchmark-results/
